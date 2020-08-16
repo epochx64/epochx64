@@ -5,8 +5,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "../kernel/defs.h"
-
 typedef uint8_t byte;
 
 namespace mem

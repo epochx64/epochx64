@@ -25,8 +25,6 @@ extern "C"
 };
 
 namespace kernel
-
-namespace kernel
 {
     void
     process_multiboot();
