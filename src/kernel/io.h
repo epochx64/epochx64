@@ -66,21 +66,6 @@ namespace io
 
         return int_out;
     }
-
-    //  Goes out to COM1
-    class dbgout
-    {
-    public:
-        dbgout();
-
-        dbgout &operator<<(char *str);
-    };
-
-    class kout
-    {
-    public:
-        kout &operator<<(char *str);
-    };
 }
 
 #endif
