@@ -22,8 +22,6 @@ namespace log
      * @return Number of bytes written
      */
     uint64_t write(char *str);
-
-    void kprint(char *str, graphics::Color background, graphics::Color foreground);
 }
 
 #endif

@@ -26,6 +26,31 @@ extern "C"
 
 namespace kernel
 {
+    #define COLOR_WHITE graphics::Color(255, 255, 255, 0)
+    #define COLOR_BLACK graphics::Color(0,0,0,0)
+
+    typedef struct
+    {
+        uint64_t size;
+    } mem_info_t;
+
+    //  Goes out to COM1
+    class dbgout
+    {
+    public:
+        dbgout();
+
+        dbgout &operator<<(char *str);
+    };
+
+    class kout
+    {
+    public:
+        kout();
+
+        kout &operator<<(char *str);
+    };
+
     void
     process_multiboot();
 

@@ -9,9 +9,10 @@ namespace kernel
     static uint64_t u64PML4_Addr;
     static uint64_t u64Multiboot2_Info_Addr;
 
-    static uint64_t u64Memory_Size;
+    static mem_info_t mem_info;
 
-    static io::dbgout dout;
+    static dbgout dout;
+    static kout krnlout;
 
     void
     process_multiboot()
@@ -30,9 +31,8 @@ namespace kernel
                 case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
                     {
                         auto memtag = (multiboot_tag_basic_meminfo*)tag;
-                        u64Memory_Size = (memtag->mem_lower + memtag->mem_upper)*0x400;
+                        mem_info.size = (memtag->mem_lower + memtag->mem_upper)*0x400;
 
-                        dout << "Detected memory: " << io::to_int(u64Memory_Size/0x100000) << " MiB\n";
                         break;
                     }
 
@@ -45,11 +45,6 @@ namespace kernel
                         _Frame_Buffer_Info.u32Width     = fbtag->common.framebuffer_width;
                         _Frame_Buffer_Info.u32Pitch     = fbtag->common.framebuffer_pitch;
                         _Frame_Buffer_Info.u32Size      = fbtag->common.size;
-
-                        //  to_hex/int without delete[] creates memory leaks FYI
-                        //  i'm lazy and need debug messages tho
-                        dout << "VESA framebuffer address: 0x" << io::to_hex(_Frame_Buffer_Info.u64Address) << "\n";
-                        //dout << "VESA framebuffer size: " << io::to_int()
                         break;
                     }
 
@@ -66,6 +61,90 @@ namespace kernel
         {
             identity_map(_Frame_Buffer_Info.u64Address + (uint64_t)i*0x1000, PRESENT | WRITE | USER);
         }
+    }
+
+    dbgout::dbgout()
+    {
+
+    }
+
+    dbgout &dbgout::operator<<(char *str)
+    {
+        log::write(str);
+        return *this;
+    }
+
+    kout::kout()
+    {
+
+    }
+
+    //  K_tty = kernel_tty
+    static uint16_t k_tty_col = 0;
+    static uint16_t k_tty_lin = 0;
+
+    void
+    k_puchar(char c)
+    {
+        using namespace graphics;
+
+        if (c == '\n')
+        {
+            k_tty_col = 0;
+            k_tty_lin++;
+            return;
+        }
+
+        auto pixel_address = (uint64_t)(_Frame_Buffer_Info.u64Address + k_tty_lin*_Frame_Buffer_Info.u32Pitch*16 + k_tty_col*4*8);
+
+        for(size_t i = 0; i < 16; i++)
+        {
+            uint8_t and_mask    = 0b10000000;
+            auto font_rom_byte  = (uint8_t)(font_rom::buffer[ ((size_t)c)*16 + i ]);
+
+            //  Left to right, fill in pixel
+            //  row based on font_rom bits
+            for(size_t j = 0; j < 8; j++)
+            {
+                bool isForeground = (bool) ( font_rom_byte & and_mask );
+                Color pixel_color = isForeground? COLOR_WHITE : COLOR_BLACK;
+                and_mask >>= (unsigned)1;
+
+                *((uint32_t*)(pixel_address + 4*j)) =
+                        (pixel_color.u8_A << 24)
+                        | (pixel_color.u8_R << 16)
+                        | (pixel_color.u8_G << 8)
+                        | (pixel_color.u8_B << 0);
+            }
+
+            pixel_address += _Frame_Buffer_Info.u32Pitch;
+        }
+
+        k_tty_col++;
+    }
+
+    kout
+    &kout::operator<<(char *str)
+    {
+        uint64_t len = io::strlen(str);
+
+        for(uint64_t i = 0; i < len; i++) k_puchar(*(str + i));
+
+        return *this;
+    }
+
+    void
+    print_logo()
+    {
+        krnlout <<
+                "|        \\|       \\  /      \\  /      \\ |  \\  |  \\|  \\  |  \\ /      \\ |  \\  |  \\\n"
+                "| $$$$$$$$| $$$$$$$\\|  $$$$$$\\|  $$$$$$\\| $$  | $$| $$  | $$|  $$$$$$\\| $$  | $$\n"
+                "| $$__    | $$__/ $$| $$  | $$| $$   \\$$| $$__| $$ \\$$\\/  $$| $$___\\$$| $$__| $$\n"
+                "| $$  \\   | $$    $$| $$  | $$| $$      | $$    $$  >$$  $$ | $$    \\ | $$    $$\n"
+                "| $$$$$   | $$$$$$$ | $$  | $$| $$   __ | $$$$$$$$ /  $$$$\\ | $$$$$$$\\ \\$$$$$$$$\n"
+                "| $$_____ | $$      | $$__/ $$| $$__/  \\| $$  | $$|  $$ \\$$\\| $$__/ $$      | $$\n"
+                "| $$     \\| $$       \\$$    $$ \\$$    $$| $$  | $$| $$  | $$ \\$$    $$      | $$\n"
+                " \\$$$$$$$$ \\$$        \\$$$$$$   \\$$$$$$  \\$$   \\$$ \\$$   \\$$  \\$$$$$$        \\$$\n\n";
     }
 }
 
@@ -85,9 +164,8 @@ bool gfxroutine(graphics::Color *c)
     {
         for(int j = 0; j < 8; j++)
         {
-            put_pixel(800 + (200+j)*cos(theta), 450+(80+j)*sin(theta), &_Frame_Buffer_Info, *c);
+            put_pixel(800 + (200+j*j*j)*cos(theta), 450+(80+j*j)*sin(theta), &_Frame_Buffer_Info, *c);
             put_pixel(800 + (80+j)*cos(theta), 450+(200+j)*sin(theta), &_Frame_Buffer_Info, *c);
-            put_pixel(800 + (80-8+j/2)*cos(theta), 450+(80-8+j/2)*sin(theta), &_Frame_Buffer_Info, *c);
         }
 
         c->u8_R += 1;
@@ -113,7 +191,8 @@ kernel_main (
     using namespace paging;
     using namespace graphics;
 
-    dout << "- - - - - - - - Init - - - - - - - - -\n";
+    dout << "-_-_-_-_- Init -_-_-_-_-\n";
+    //  TODO: Print kernel size
 
     u64PML4_Addr            = u64pml4_addr;
     u64Multiboot2_Info_Addr = u64multiboot2_info_addr;
@@ -123,12 +202,14 @@ kernel_main (
     process_multiboot();
     init_vesa();
 
-    dout << "Heap address: 0x"      << io::to_hex(u64heap_addr)                     << "\n";
-    dout << "Heap_end address: 0x"  << io::to_hex(u64heap_addr + u64heap_size)  << "\n";
+    print_logo();
 
-    Color c1(128, 255, 0, 0);
-    Color c2(0, 0, 0, 0);
+    //  TODO: to_hex/int without delete[] creates memory leaks FYI
+    //  i'm lazy and need debug messages tho
+    krnlout << "Detected memory: " << io::to_int(mem_info.size/0x100000) << " MiB\n";
+    krnlout << "Heap address: 0x"      << io::to_hex(u64heap_addr)                     << "\n";
+    krnlout << "Heap_end address: 0x"  << io::to_hex(u64heap_addr + u64heap_size)  << "\n";
 
-    log::kprint("A", c2, c1);
-    while(gfxroutine(&c1));
+    Color c(128, 255, 0, 0);
+    while(gfxroutine(&c));
 }
