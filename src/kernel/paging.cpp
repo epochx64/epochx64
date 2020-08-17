@@ -3,8 +3,6 @@
 extern uint64_t u64Heap_Addr;
 extern uint64_t u64Heap_Size;
 
-static io::dbgout dout;
-
 namespace paging
 {
     /*
