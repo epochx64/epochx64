@@ -12,6 +12,10 @@
 #include "log.h"
 #include "../include/mem.h"
 
+extern uint64_t u64Heap_Addr;
+extern uint64_t u64Heap_Size;
+extern uint64_t heap_page_index;
+
 namespace paging
 {
     /* - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -107,8 +111,12 @@ namespace paging
      * TODO: Maybe also implement a way to deallocate
      * @return
      */
-    page_map_t*
-    page_map_alloc();
+
+    inline page_map_t*
+    page_map_alloc()
+    {
+        return (page_map_t*)( u64Heap_Addr + u64Heap_Size - (0x1000*++heap_page_index) );
+    }
 }
 
 #endif

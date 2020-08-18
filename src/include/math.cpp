@@ -32,10 +32,4 @@ namespace math
     {
         return sin(theta + (PI/2));
     }
-
-    double fmod(double val, double divisor)
-    {
-        auto n_divisors = (uint64_t)(val / divisor);
-        return val - (double)(n_divisors*divisor);
-    }
 }

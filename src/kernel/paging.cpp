@@ -1,16 +1,7 @@
 #include "paging.h"
 
-extern uint64_t u64Heap_Addr;
-extern uint64_t u64Heap_Size;
-
 namespace paging
 {
-    /*
-     * Keeps track of how far down the heap
-     * is allocated to page map structures
-     */
-    static uint64_t heap_page_index = 0;
-
     void
     identity_map(uint64_t u64addr, uint16_t u16flags)
     {
@@ -73,11 +64,5 @@ namespace paging
                 page_map_iter = (page_map_t*)(pml_info->addr_pml[i-1]);
             }
         }
-    }
-
-    page_map_t*
-    page_map_alloc()
-    {
-        return (page_map_t*)( u64Heap_Addr + u64Heap_Size - (0x1000*++heap_page_index) );
     }
 }

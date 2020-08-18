@@ -1,7 +1,3 @@
-//
-// Created by Beta on 2020-05-30.
-//
-
 #ifndef IO_H
 #define IO_H
 
@@ -10,12 +6,17 @@
 #include <stdint.h>
 
 #include "heap.h"
-#include "log.h"
 #include "../include/math.h"
 
 namespace io
 {
-    uint64_t strlen(char *str);
+    inline uint64_t strlen(char *str)
+    {
+        uint64_t return_value = 0;
+        while ( str[return_value++] );
+
+        return return_value - 1;
+    }
 
     /***
      * Takes in a uint{8,16,32,64}_t and outputs
@@ -25,7 +26,7 @@ namespace io
      * @return
      */
     template<class T>
-    char *to_hex(T val)
+    inline char *to_hex(T val)
     {
         uint8_t hex_size    = sizeof(val) * 2;
         auto hex_out        = new char[hex_size + 1];
@@ -48,7 +49,7 @@ namespace io
     }
 
     template<class T>
-    char *to_int(T val)
+    inline char *to_int(T val)
     {
         uint8_t int_size = math::ilog((T)10, val);
         auto int_out = new char[int_size + 1];
