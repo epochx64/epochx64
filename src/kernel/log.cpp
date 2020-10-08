@@ -1,5 +1,6 @@
 #include "log.h"
 
+<<<<<<< HEAD
 namespace kernel
 {
     extern KERNEL_BOOT_INFO KernelBootInfo;
@@ -105,4 +106,9 @@ namespace log
 
         ASMx64::outb(COM1, c);
     }
+=======
+namespace log
+{
+
+>>>>>>> 3ba874f320446bb2a68008015348e10f7f24c408
 }
