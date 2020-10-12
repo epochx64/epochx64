@@ -8,7 +8,7 @@
 #include <elf.h>
 #include <boot/boot.h>
 
-typedef __attribute__((sysv_abi)) void (*KERNEL_ENTRY)(KERNEL_BOOT_INFO);
+typedef __attribute__((sysv_abi)) void (*KERNEL_ENTRY)(KERNEL_BOOT_INFO*);
 
 UINT64 StrLen(char *str)
 {
@@ -258,7 +258,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     /*  Signal that we're done bootstrapping and jump to the kernel entry point */
     OutputString(SystemTable->ConOut, L"CALLING KERNEL\n\r");
     SystemTable->BootServices->ExitBootServices(ImageHandle, KernelInfo.MapKey);
-    KernelEntry(KernelInfo);
+    KernelEntry(&KernelInfo);
 
     return Status;
 }

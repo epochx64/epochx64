@@ -3,7 +3,7 @@
 namespace kernel
 {
     //  TODO:   make these pointers
-    KERNEL_BOOT_INFO KernelBootInfo;
+    KERNEL_BOOT_INFO *KernelBootInfo;
     KERNEL_DESCRIPTOR KernelDescriptor;
 }
 
@@ -30,7 +30,7 @@ void gfxroutine(scheduler::TASK_ARG *TaskArgs)
         //  Draw a fat circle
         for (double theta = 0.0; theta < 2*PI; theta += dtheta) {
             for (int j = 0; j < radius; j++)
-                PutPixel(x + j*cos(theta), y + j*sin(theta), &(KernelBootInfo.FramebufferInfo), c);
+                PutPixel(x + j*cos(theta), y + j*sin(theta), &(KernelBootInfo->FramebufferInfo), c);
         }
 
         c.u8_R += 10;
@@ -39,14 +39,16 @@ void gfxroutine(scheduler::TASK_ARG *TaskArgs)
     }
 }
 
-void KernelMain(KERNEL_BOOT_INFO KernelInfo)
+void KernelMain(KERNEL_BOOT_INFO *KernelInfo)
 {
     using namespace kernel;
 
     /*
      * Setup IDT, SSE, PIT, and PS2
      */
-    KernelBootInfo = KernelInfo;
+    KernelBootInfo = new KERNEL_BOOT_INFO;
+    mem::copy((byte*)KernelInfo, (byte*)KernelBootInfo, sizeof(KERNEL_BOOT_INFO));
+
     {
         using namespace interrupt;
         using namespace ASMx64;
@@ -63,7 +65,7 @@ void KernelMain(KERNEL_BOOT_INFO KernelInfo)
     /*
      *  So far this only initializes APIC timer
      */
-    ACPI::InitACPI(&KernelInfo, &(KernelDescriptor.KernelACPIInfo));
+    ACPI::InitACPI(KernelBootInfo, &(KernelDescriptor.KernelACPIInfo));
 
     /*
      * Setup a scheduler before the APIC timer is enabled

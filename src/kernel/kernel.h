@@ -9,7 +9,7 @@
 #include <kernel/acpi.h>
 #include <kernel/log.h>
 
-extern "C" void KernelMain(KERNEL_BOOT_INFO);
+extern "C" void KernelMain(KERNEL_BOOT_INFO*);
 
 namespace kernel
 {

@@ -2,7 +2,7 @@
 
 namespace kernel
 {
-    extern KERNEL_BOOT_INFO KernelBootInfo;
+    extern KERNEL_BOOT_INFO *KernelBootInfo;
 }
 
 namespace log
@@ -44,7 +44,7 @@ namespace log
                 k_tty_col = 0;
 
                 //  We don't want to go out of the screen
-                k_tty_lin = (k_tty_lin + 1) % (KernelBootInfo.FramebufferInfo.Height/16 - 1);
+                k_tty_lin = (k_tty_lin + 1) % (KernelBootInfo->FramebufferInfo.Height/16 - 1);
                 return;
 
                 //This is temporary
@@ -62,7 +62,7 @@ namespace log
                 return;
         }
 
-        auto pixel_address = (uint64_t)(KernelBootInfo.FramebufferInfo.pFrameBuffer + 16*k_tty_lin*(KernelBootInfo.FramebufferInfo.Pitch) + k_tty_col*4*8);
+        auto pixel_address = (uint64_t)(KernelBootInfo->FramebufferInfo.pFrameBuffer + 16*k_tty_lin*(KernelBootInfo->FramebufferInfo.Pitch) + k_tty_col*4*8);
 
         for(size_t i = 0; i < 16; i++)
         {
@@ -80,13 +80,13 @@ namespace log
                 *((uint32_t*)(pixel_address + 4*j)) = pixel_color.To_VBE_Word();
             }
 
-            pixel_address += KernelBootInfo.FramebufferInfo.Pitch;
+            pixel_address += KernelBootInfo->FramebufferInfo.Pitch;
         }
 
-        if(++k_tty_col > KernelBootInfo.FramebufferInfo.Width / 8)
+        if(++k_tty_col > KernelBootInfo->FramebufferInfo.Width / 8)
         {
             k_tty_col = 0;
-            k_tty_lin = (k_tty_lin + 1) % (KernelBootInfo.FramebufferInfo.Height/16 - 1);
+            k_tty_lin = (k_tty_lin + 1) % (KernelBootInfo->FramebufferInfo.Height/16 - 1);
         }
     }
 
