@@ -2,6 +2,7 @@
 #define _TYPEDEF_H
 
 #include <defs/int.h>
+#include <boot/boot.h>
 
 namespace interrupt
 {

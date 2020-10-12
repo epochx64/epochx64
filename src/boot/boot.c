@@ -6,7 +6,7 @@
 #include <Guid/Acpi.h>
 #include <stddef.h>
 #include <elf.h>
-#include <defs/boot.h>
+#include <boot/boot.h>
 
 typedef __attribute__((sysv_abi)) void (*KERNEL_ENTRY)(KERNEL_BOOT_INFO);
 
