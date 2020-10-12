@@ -13,7 +13,7 @@ namespace ACPI
 
     extern bool x2APIC;
 
-    void InitACPI(kernel::KERNEL_BOOT_INFO *KernelInfo, KERNEL_ACPI_INFO *KernelACPIInfo);
+    void InitACPI(KERNEL_BOOT_INFO *KernelInfo, KERNEL_ACPI_INFO *KernelACPIInfo);
 
     void InitAPIC(KERNEL_ACPI_INFO *KernelACPIInfo);
 

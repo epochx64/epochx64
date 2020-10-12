@@ -38,7 +38,7 @@ namespace graphics
     static void FORCE_INLINE PutPixel (
             uint32_t                    x,
             uint32_t                    y,
-            kernel::FRAMEBUFFER_INFO   *FrameBufferInfo,
+            FRAMEBUFFER_INFO   *FrameBufferInfo,
             Color                       color
     )
     {

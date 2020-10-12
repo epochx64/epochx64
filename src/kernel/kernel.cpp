@@ -39,7 +39,7 @@ void gfxroutine(scheduler::TASK_ARG *TaskArgs)
     }
 }
 
-void KernelMain(kernel::KERNEL_BOOT_INFO KernelInfo)
+void KernelMain(KERNEL_BOOT_INFO KernelInfo)
 {
     using namespace kernel;
 
@@ -61,37 +61,38 @@ void KernelMain(kernel::KERNEL_BOOT_INFO KernelInfo)
     }
 
     /*
+     *  So far this only initializes APIC timer
+     */
+    ACPI::InitACPI(&KernelInfo, &(KernelDescriptor.KernelACPIInfo));
+
+    /*
      * Setup a scheduler before the APIC timer is enabled
      * and add a couple of tasks
      */
     using namespace scheduler;
     {
         Scheduler0 = new scheduler::Scheduler(true, 0);
-        Scheduler0->AddTask(new Task(
-                (UINT64)&gfxroutine,
-                true,
-                new TASK_ARG[3] {
-                    (TASK_ARG)(new double(200.0)),
-                    (TASK_ARG)(new double(200.0)),
-                    (TASK_ARG)(new int(100))
-                }
-                ));
 
         Scheduler0->AddTask(new Task(
                 (UINT64)&gfxroutine,
                 true,
                 new TASK_ARG[3] {
-                    (TASK_ARG)(new double(900.0)),
-                    (TASK_ARG)(new double(300.0)),
-                    (TASK_ARG)(new int(130))
+                        (TASK_ARG)(new double(200.0)),
+                        (TASK_ARG)(new double(200.0)),
+                        (TASK_ARG)(new int(100))
+                }
+        ));
+
+        Scheduler0->AddTask(new Task(
+                (UINT64)&gfxroutine,
+                true,
+                new TASK_ARG[3] {
+                        (TASK_ARG)(new double(900.0)),
+                        (TASK_ARG)(new double(300.0)),
+                        (TASK_ARG)(new int(130))
                 }
         ));
     }
-
-    /*
-     *  So far this only initializes APIC timer
-     */
-    ACPI::InitACPI(&KernelInfo, &(KernelDescriptor.KernelACPIInfo));
 
     ASMx64::sti();
 
@@ -111,4 +112,3 @@ void KernelMain(kernel::KERNEL_BOOT_INFO KernelInfo)
         (TASK_ARG)(new int(100))
     });
 }
-

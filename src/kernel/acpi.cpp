@@ -5,7 +5,7 @@ namespace ACPI
     using namespace log;
     bool x2APIC;
 
-    void InitACPI(kernel::KERNEL_BOOT_INFO *KernelInfo, KERNEL_ACPI_INFO *KernelACPIInfo)
+    void InitACPI(KERNEL_BOOT_INFO *KernelInfo, KERNEL_ACPI_INFO *KernelACPIInfo)
     {
         KernelACPIInfo->RSDPDescriptor = (RSDP_DESCRIPTOR*)(KernelInfo->RSDP);
 
