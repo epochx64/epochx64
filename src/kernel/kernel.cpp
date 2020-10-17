@@ -47,7 +47,6 @@ void KernelMain(KERNEL_BOOT_INFO *KernelInfo)
      */
     KernelBootInfo = new KERNEL_BOOT_INFO;
     mem::copy((byte*)KernelInfo, (byte*)KernelBootInfo, sizeof(KERNEL_BOOT_INFO));
-
     {
         using namespace interrupt;
         using namespace ASMx64;
@@ -60,6 +59,8 @@ void KernelMain(KERNEL_BOOT_INFO *KernelInfo)
         InitPS2();
         InitPIT();
     }
+
+    ASMx64::pFramebuffer = KernelBootInfo->FramebufferInfo.pFrameBuffer;
 
     /*
      *  So far this only initializes APIC timer
@@ -78,7 +79,7 @@ void KernelMain(KERNEL_BOOT_INFO *KernelInfo)
                 (UINT64)&gfxroutine,
                 true,
                 new TASK_ARG[3] {
-                        (TASK_ARG)(new double(200.0)),
+                        (TASK_ARG)(new double(400.0)),
                         (TASK_ARG)(new double(200.0)),
                         (TASK_ARG)(new int(100))
                 }

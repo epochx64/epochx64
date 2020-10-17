@@ -30,6 +30,12 @@ SECTIONS
      * needs to be in the lower 1MiB of memory and also has
      * to be 4KiB aligned
      */
+    . = 0x1000;
+    .apbootstrapdata ALIGN(4K) : AT (ADDR(.apbootstrapdata))
+    {
+        *(.apbootstrapdata)
+    }
+
     . = 0x10000;
 
     .apbootstrap ALIGN (4K) : AT (ADDR(.apbootstrap))

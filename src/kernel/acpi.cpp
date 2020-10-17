@@ -22,19 +22,18 @@ namespace ACPI
 
     void InitAPIC(KERNEL_ACPI_INFO *KernelACPIInfo)
     {
-        using namespace ASMx64;
-
-        /*
-         * Disable the 8259 PIC by masking all IRQs except for IRQ0
-         * we will need to use a PIC sleep function to determine LAPIC's CPU bus frequency
-         */
-        outb(0xA1, 0xFF);
-        outb(0x21, 0b11111110);
-
         /*
          * APIC setup for the Boostrap Processor (BSP)
          */
         {
+            using namespace ASMx64;
+            /*
+             * Disable the 8259 PIC by masking all IRQs except for IRQ0
+             * we will need to use a PIC sleep function to determine LAPIC's CPU bus frequency
+             */
+            outb(0xA1, 0xFF);
+            outb(0x21, 0b11111110);
+
             //  Grab the APIC BASE MSR value
             UINT64 MSRValue = 0;
             ReadMSR(0x01B, &MSRValue);
@@ -98,39 +97,54 @@ namespace ACPI
              * Parse the MADT to find all APICs
              */
             UINT8 nCores = 0;
-            UINT8 nEnabled = 0;
             auto Iterator = (UINT8*)((UINT64)pMADT + 0x2C);
 
             while(true)
             {
                 auto Type  = *Iterator;
                 auto Size  = *(Iterator + 1);
+                auto ID    = *(Iterator + 3);
                 auto Flags = *(Iterator + 4);
 
-                if( (Type == MADT_LAPIC) && (Flags & 0b00000011) ) nCores++;
-                if( (Type == MADT_LAPIC) && (Flags & 0b00000001) ) nEnabled++;
+                if( (Type == MADT_LAPIC) && (Flags & 0b00000011) )
+                {
+                    nCores++;
+                    kout << "APIC ID: 0x" << HEX << ID << "\n";
+                }
 
                 if(Size == 0) break;
                 Iterator += Size;
             }
-            kout << DEC << "Found " << nCores << " cores, " << nEnabled << " are enabled\n";
+            kout << DEC << "Found " << nCores << " logical processors\n";
 
             /*
-             * Broadcast INIT Interprocessor Interrupt (IPI) to all Application Processors (APs)
+             * The Application Processors (APs) are going to need these for when they
+             * bootstrap from 16-bit real mode to 64-bit long mode
+             */
+            UINT64 CR3Value;
+            ASMx64::GetCR3Value(&CR3Value);
+            kout << "CR3Value: 0x" << HEX << CR3Value << "\n";
+            ASMx64::CR3Value = CR3Value;
+            UINT64 Vector = (UINT64)&ASMx64::APBootstrap >> 12;
+            kout << "Vector: 0x" << HEX << Vector << "\n";
+
+            /*
+             * Broadcast INIT Interprocessor Interrupt (IPI) to all APs
              */
             SetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, APIC_REGISTER_ICR, 0x000C4500);
 
             //  TODO: If this don't work we gotta implement a sleep function and wait for 10ms here
+            kout << "Vector: 0x" << HEX << Vector << "\n";
 
             /*
-             * Broadcast SIPI IPI to all APs where 10 = address 0x100000, vector to bootstrap code
+             * Broadcast SIPI IPI to all APs where a vector 0x10 = address 0x100000, vector to bootstrap code
              * We have to do it twice for some reason
              */
-            SetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, APIC_REGISTER_ICR, 0x000C4610);
+            SetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, APIC_REGISTER_ICR, 0x000C4600 | Vector);
 
-            //  TODO: If it still don't work we gotta implement 20us sleep here
-
-            SetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, APIC_REGISTER_ICR, 0x000C4610);
+            //  TODO: If it still don't work we gotta implement 200us sleep here
+            kout << "Vector: 0x" << HEX << Vector << "\n";
+            SetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, APIC_REGISTER_ICR, 0x000C4600 | Vector);
         }
     }
 

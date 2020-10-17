@@ -345,6 +345,8 @@ ISR44:
 
     iretq
 
+    extern IDTR64
+    extern GDTR64
 
 ; TODO: Make this take an argument for the IDTR
     global lidt
@@ -354,7 +356,7 @@ lidt:
 
     global lgdt
 lgdt:
-    lgdt [GDT64.Pointer]
+    lgdt [GDTR64]
 
     ;   Changes CS register to 0x08
     ;   (code segment descriptor in new GDT)
@@ -363,7 +365,8 @@ lgdt:
     retfq
 
 done:
-    mov ax, GDT64.Data
+    ;   GDT data segment
+    mov ax, 0x10
     mov ds, ax
     mov es, ax
     mov fs, ax
@@ -371,48 +374,3 @@ done:
     mov ss, ax
 
     ret
-
-    ; -------------------------------------------------
-    ;               IDT and GDT Structures
-    ; -------------------------------------------------
-
-    section .bss
-    align 4096
-    global IDT64_PTR
-IDT64_PTR:
-    resb 4096
-IDT64_end:
-
-    section .data
-    align 4096
-    global IDTR64
-IDTR64:
-    limit:  dw 4095
-    offset: dq IDT64_PTR
-
-    align 4096
-GDT64:                           ; Global Descriptor Table (64-bit).
-    .Null: equ $ - GDT64         ; The null descriptor.
-    dw 0xFFFF                    ; Limit (low).
-    dw 0                         ; Base (low).
-    db 0                         ; Base (middle)
-    db 0                         ; Access.
-    db 1                         ; Granularity.
-    db 0                         ; Base (high).
-    .Code: equ $ - GDT64         ; The code descriptor.
-    dw 0                         ; Limit (low).
-    dw 0                         ; Base (low).
-    db 0                         ; Base (middle)
-    db 10011010b                 ; Access (exec/read).
-    db 10101111b                 ; Granularity, 64 bits flag, limit19:16.
-    db 0                         ; Base (high).
-    .Data: equ $ - GDT64         ; The data descriptor.
-    dw 0                         ; Limit (low).
-    dw 0                         ; Base (low).
-    db 0                         ; Base (middle)
-    db 10010010b                 ; Access (read/write).
-    db 00000000b                 ; Granularity.
-    db 0                         ; Base (high).
-    .Pointer:                    ; The GDT-pointer.
-    dw $ - GDT64 - 1             ; Limit.
-    dq GDT64                     ; Base.

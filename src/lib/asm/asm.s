@@ -1,17 +1,170 @@
+    section .apbootstrapdata
+; -------------------------------------------------
+;               IDT and GDT Structures
+; -------------------------------------------------
+    align 4096
+    global IDT64_PTR
+IDT64_PTR:
+    times 4096 db 0
+IDT64_end:
+
+    align 4096
+    global IDTR64
+IDTR64:
+limit:  dw 4095
+offset: dq IDT64_PTR
+
+    align 4096
+GDT64:                           ; Global Descriptor Table (64-bit).
+.Null: equ $ - GDT64         ; The null descriptor.
+    dw 0xFFFF                    ; Limit (low).
+    dw 0                         ; Base (low).
+    db 0                         ; Base (middle)
+    db 0                         ; Access.
+    db 1                         ; Granularity.
+    db 0                         ; Base (high).
+.Code: equ $ - GDT64         ; The code descriptor.
+    dw 0                         ; Limit (low).
+    dw 0                         ; Base (low).
+    db 0                         ; Base (middle)
+    db 10011010b                 ; Access (exec/read).
+    db 10101111b                 ; Granularity, 64 bits flag, limit19:16.
+    db 0                         ; Base (high).
+.Data: equ $ - GDT64         ; The data descriptor.
+    dw 0                         ; Limit (low).
+    dw 0                         ; Base (low).
+    db 0                         ; Base (middle)
+    db 10010010b                 ; Access (read/write).
+    db 00000000b                 ; Granularity.
+    db 0                         ; Base (high).
+    global GDTR64
+GDTR64:                          ; The GDT-pointer.
+    dw $ - GDT64 - 1             ; Limit.
+    dq GDT64                     ; Base.
+
+    align 4096
+GDT32:                           ; Global Descriptor Table (32-bit).
+.Null: equ $ - GDT32         ; The null descriptor.
+    dw 0xFFFF                    ; Limit (low).
+    dw 0                         ; Base (low).
+    db 0                         ; Base (middle)
+    db 0                         ; Access.
+    db 1                         ; Granularity.
+    db 0                         ; Base (high).
+.Code: equ $ - GDT32         ; The code descriptor.
+    dw 0xFFFF                    ; Limit (low).
+    dw 0                         ; Base (low).
+    db 0                         ; Base (middle)
+    db 10011010b                 ; Access (exec/read).
+    db 11001111b                 ; Granularity, 64 bits flag, limit19:16. OLD VALUE: 10101111b
+    db 0                         ; Base (high).
+.Data: equ $ - GDT32         ; The data descriptor.
+    dw 0xFFFF                    ; Limit (low).
+    dw 0                         ; Base (low).
+    db 0                         ; Base (middle)
+    db 10010010b                 ; Access (read/write).
+    db 11001111b                 ; Granularity.
+    db 0                         ; Base (high).
+
+GDTR32:                          ; The GDT-pointer.
+    dw $ - GDT32 - 1             ; Limit.
+    dd GDT32                     ; Base.
+
+    global CR3Value
+CR3Value: dd 0
+
+    global pFramebuffer
+pFramebuffer: dq 0
+
     section .apbootstrap
     bits 16
-    align 4096
 
+    align 4096
     global APBootstrap
 APBootstrap:
-    ;   Just some random instructions to use 100% of the core
-    mov ax, 0x16
-    mov dx, ax
-    xchg dx, cx
-    jmp APBootstrap
+    cli
+
+    ; Load the GDT and IDT
+    lgdt [GDTR32]
+
+    ; Set Protection Enable (PE) bit
+    mov eax, cr0
+    or al, 1
+    mov cr0, eax
+
+    ; Clear 16 bit instruction prefetch queue
+    jmp ClearPrefetchQueue
+    nop
+    nop
+ClearPrefetchQueue:
+    ; Set data segments to GDT descriptor
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov ss, ax
+
+    ; Jump to protected mode
+    db 0x66
+    db 0xEA
+    dd ProtectedMode
+    dw 0x0008
+
+    bits 32
+ProtectedMode:
+    ;   Enable Physical Address Extension (PAE)
+    mov eax, cr4
+    or eax, 1 << 5  ;   6th bit
+    mov cr4, eax
+
+    ;   Address of the PML4
+    mov eax, [CR3Value]
+    mov cr3, eax
+
+    ;   Set Extended Features Enable (EFER) in Model Specific Register (MSR)
+    mov ecx, 0xc0000080
+    rdmsr
+    or eax, 1 << 8  ;   LM Bit
+    wrmsr
+
+    ;   Enable Paging
+    mov eax, cr0
+    or eax, 1 << 31 ; PG bit
+    mov cr0, eax
+
+    lgdt [GDTR64]
+    jmp 0x08:APLongMode
 
     section .text
     bits 64
+
+APLongMode:
+    cli
+
+    mov ax, 0x10
+    mov ds, ax
+    mov es, ax
+    mov fs, ax
+    mov gs, ax
+    mov ss, ax
+
+    ;   Write some stuff to the frame buffer
+    mov rcx, 0
+    mov rax, [pFramebuffer]
+testloop:
+    mov dword [rax], 0xFFFFFFFF
+
+    inc rcx
+    add rax, 4
+
+    cmp rcx, 4096
+    jge halt
+    jmp testloop
+
+halt:
+    hlt
+    jmp halt
 
 ; ----------------------------------------------------------
 ;               C-callable asm functions                   |
@@ -69,16 +222,20 @@ SetMSR:
     xor rdx, rdx
     xor rax, rax
 
+    ; Some hardware, for no apparent reason, needs this here
+    push rbx
+
     ;   Place rsi into edx:eax
     mov rax, rsi
     mov rbx, 0x00000000FFFFFFFF
     and rax, rbx
-
-    shr rsi, 32
     mov rdx, rsi
+    shr rdx, 32
 
     mov rcx, rdi    ;   MSRID
     wrmsr
+
+    pop rbx
 
     ret
 
@@ -96,6 +253,14 @@ ReadRFLAGS:
     mov rsi, [rsp+0]
     mov [rdi], rsi
     popf
+    ret
+
+    global GetCR3Value
+GetCR3Value:
+    xor rax, rax
+    mov rax, cr3
+    mov [rdi], rax
+
     ret
 
     section .bss
@@ -119,8 +284,7 @@ EnableSSE:
 
     ;   OSXSAVE bit
     ;or rax, 1 << 18
-
-    mov cr4, rax
+    ;mov cr4, rax
 
     ;   Save the current FPU state
     fxsave [SSEINFO]
