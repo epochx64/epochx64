@@ -29,6 +29,8 @@ namespace ASMx64
 
     extern "C" void ReadRFLAGS(UINT64 *RFLAGS);
     extern "C" void EnableSSE();
+
+    extern "C" void APBootstrap();
 }
 
 

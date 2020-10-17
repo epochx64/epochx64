@@ -10,6 +10,7 @@
 namespace ACPI
 {
     #define X2APIC_BIT (1 << 21)
+    #define APIC_REGISTER_ICR 0x300
 
     extern bool x2APIC;
 

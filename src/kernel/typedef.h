@@ -77,6 +77,8 @@ namespace log
 
 namespace ACPI
 {
+    #define MADT_LAPIC 0
+
     typedef struct
     {
         char Signature[8];

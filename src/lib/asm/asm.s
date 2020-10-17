@@ -1,6 +1,17 @@
-bits 64
+    section .apbootstrap
+    bits 16
+    align 4096
 
-section .text
+    global APBootstrap
+APBootstrap:
+    ;   Just some random instructions to use 100% of the core
+    mov ax, 0x16
+    mov dx, ax
+    xchg dx, cx
+    jmp APBootstrap
+
+    section .text
+    bits 64
 
 ; ----------------------------------------------------------
 ;               C-callable asm functions                   |
@@ -91,8 +102,6 @@ ReadRFLAGS:
     align 16
 SSEINFO: resb 512
     section .text
-
-
 
 ;   Sets up floating point math
     global EnableSSE

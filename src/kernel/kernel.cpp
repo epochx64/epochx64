@@ -2,7 +2,6 @@
 
 namespace kernel
 {
-    //  TODO:   make these pointers
     KERNEL_BOOT_INFO *KernelBootInfo;
     KERNEL_DESCRIPTOR KernelDescriptor;
 }
@@ -106,7 +105,7 @@ void KernelMain(KERNEL_BOOT_INFO *KernelInfo)
 
     /*
      * Test graphics routine (draws a circle)
-     * TODO:   Double buffering
+     * TODO: Double buffering
      */
     gfxroutine(new scheduler::TASK_ARG[3] {
         (TASK_ARG)(new double(500.0)),

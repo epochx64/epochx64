@@ -5,6 +5,10 @@ namespace ACPI
     using namespace log;
     bool x2APIC;
 
+    /*
+     * TODO:    This whole file is a bunch of spaghetti
+     */
+
     void InitACPI(KERNEL_BOOT_INFO *KernelInfo, KERNEL_ACPI_INFO *KernelACPIInfo)
     {
         KernelACPIInfo->RSDPDescriptor = (RSDP_DESCRIPTOR*)(KernelInfo->RSDP);
@@ -27,10 +31,9 @@ namespace ACPI
         outb(0xA1, 0xFF);
         outb(0x21, 0b11111110);
 
-        auto pMADT = (MULTIPLE_APIC_DESCRIPTOR_TABLE*) FindSDT(KernelACPIInfo->XSDT, "APIC");
-        kout << "MADT Address: 0x" << HEX << (UINT64)pMADT << "\n";
-
-        //  APIC setup
+        /*
+         * APIC setup for the Boostrap Processor (BSP)
+         */
         {
             //  Grab the APIC BASE MSR value
             UINT64 MSRValue = 0;
@@ -39,36 +42,33 @@ namespace ACPI
             //  Check APIC version
             UINT64 rax = 1, rbx = 0, rcx = 0, rdx = 0;
             cpuid(&rax, &rbx, &rcx, &rdx);
-
             kout << "APIC Version: ";
 
             if(rcx & X2APIC_BIT)
             {
-                kout << "x2APIC\n";
-                x2APIC = true;
-
                 //  Set x2APIC mode in APIC base MSR
+                x2APIC = true;
                 MSRValue |= (1<<10);
                 SetMSR(0x01B, MSRValue);
+
+                kout << "x2APIC\n";
             }
             else
             {
-                kout << "xAPIC\n";
-
                 KernelACPIInfo->APICBase = MSRValue & 0x0000000FFFFFF000;
-            }
 
-            kout << "APIC Base MSR Value: 0x" << HEX << MSRValue << "\n";
+                kout << "xAPIC\n";
+            }
 
             //  Set the spurious interrupt vector register to vector 39
             //  Set APIC enable bit
             auto RegValue = GetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, 0xF0) | 0x100 | 0xFF;
             SetLAPICRegister(KernelACPIInfo->APICBase, 0xF0, RegValue);
-
-            //  TODO: Set the task priority register
         }
 
-        //  APIC timer setup
+        /*
+         * APIC timer setup for the BSP
+         */
         {
             //  Setup Divide Configuration Register to divide by 1
             auto APICDivideReg = GetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, 0x3E0);
@@ -85,6 +85,52 @@ namespace ACPI
             //  Set Initial Count Register
             KernelACPIInfo->APICInitCount = 0x0010000;
             SetLAPICRegister(KernelACPIInfo->APICBase, 0x380, KernelACPIInfo->APICInitCount);
+        }
+
+        /*
+         * Multicore bootstrap
+         */
+        {
+            auto pMADT = (MULTIPLE_APIC_DESCRIPTOR_TABLE*) FindSDT(KernelACPIInfo->XSDT, "APIC");
+            kout << "MADT Address: 0x" << HEX << (UINT64)pMADT << "\n";
+
+            /*
+             * Parse the MADT to find all APICs
+             */
+            UINT8 nCores = 0;
+            UINT8 nEnabled = 0;
+            auto Iterator = (UINT8*)((UINT64)pMADT + 0x2C);
+
+            while(true)
+            {
+                auto Type  = *Iterator;
+                auto Size  = *(Iterator + 1);
+                auto Flags = *(Iterator + 4);
+
+                if( (Type == MADT_LAPIC) && (Flags & 0b00000011) ) nCores++;
+                if( (Type == MADT_LAPIC) && (Flags & 0b00000001) ) nEnabled++;
+
+                if(Size == 0) break;
+                Iterator += Size;
+            }
+            kout << DEC << "Found " << nCores << " cores, " << nEnabled << " are enabled\n";
+
+            /*
+             * Broadcast INIT Interprocessor Interrupt (IPI) to all Application Processors (APs)
+             */
+            SetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, APIC_REGISTER_ICR, 0x000C4500);
+
+            //  TODO: If this don't work we gotta implement a sleep function and wait for 10ms here
+
+            /*
+             * Broadcast SIPI IPI to all APs where 10 = address 0x100000, vector to bootstrap code
+             * We have to do it twice for some reason
+             */
+            SetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, APIC_REGISTER_ICR, 0x000C4610);
+
+            //  TODO: If it still don't work we gotta implement 20us sleep here
+
+            SetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, APIC_REGISTER_ICR, 0x000C4610);
         }
     }
 

@@ -24,4 +24,16 @@ SECTIONS
     {
     	*(.data)
     }
+
+    /*
+     * The bootstrap code for the application processors (APs)
+     * needs to be in the lower 1MiB of memory and also has
+     * to be 4KiB aligned
+     */
+    . = 0x10000;
+
+    .apbootstrap ALIGN (4K) : AT (ADDR(.apbootstrap))
+    {
+        *(.apbootstrap)
+    }
 }
