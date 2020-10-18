@@ -66,19 +66,6 @@ namespace interrupt
     {
         Scheduler0->Tick();
 
-        //  Print out some debug info to the screen
-        {
-            TTY_COORD OldCOORD = kout.GetPosition();
-
-            TTY_COORD TimerCOORD;
-            TimerCOORD.Lin = 1;
-            TimerCOORD.Col = 70;
-
-            kout.SetPosition(TimerCOORD);
-            kout << "APIC Tick #" << DEC << APICTick++;
-            kout.SetPosition(OldCOORD);
-        }
-
         //  Signal End of Interrupt
         ACPI::SetLAPICRegister<UINT32>(kernel::KernelDescriptor.KernelACPIInfo.APICBase, 0x0B0, 0x00);
     }

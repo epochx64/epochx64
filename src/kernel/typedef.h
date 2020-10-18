@@ -78,6 +78,14 @@ namespace log
 namespace ACPI
 {
     #define MADT_LAPIC 0
+    #define X2APIC_BIT (1 << 21)
+    #define APIC_REGISTER_ICR 0x300
+    #define APBOOSTRAP_INFO_ENTRY_SIZE 0x10
+
+    typedef struct
+    {
+        UINT64 pStack;
+    } AP_BOOTSTRAP_INFO;
 
     typedef struct
     {

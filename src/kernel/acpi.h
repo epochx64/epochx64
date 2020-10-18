@@ -5,14 +5,13 @@
 #include <kernel/log.h>
 #include <string.h>
 #include <asm/asm.h>
+#include <lib/mem.h>
 #include <kernel/typedef.h>
 
 namespace ACPI
 {
-    #define X2APIC_BIT (1 << 21)
-    #define APIC_REGISTER_ICR 0x300
-
     extern bool x2APIC;
+    extern "C" AP_BOOTSTRAP_INFO *pAPBootstrapInfo;
 
     void InitACPI(KERNEL_BOOT_INFO *KernelInfo, KERNEL_ACPI_INFO *KernelACPIInfo);
 

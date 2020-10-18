@@ -5,9 +5,9 @@ void* operator new[] ( size_t count ) { return heap::malloc(count); }
 
 namespace heap
 {
-    //  1MB page-aligned heap
-    UINT8 __attribute__((aligned(4096))) pHeap[0x100000];
-    UINT64 HeapSize = 0x100000;
+    //  2MB page-aligned heap
+    UINT8 __attribute__((aligned(4096))) pHeap[0x200000];
+    UINT64 HeapSize = 0x200000;
 
     void*
     malloc(UINT64 size)

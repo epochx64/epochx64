@@ -76,6 +76,9 @@ CR3Value: dd 0
     global pFramebuffer
 pFramebuffer: dq 0
 
+    global pAPBootstrapInfo
+pAPBootstrapInfo: dq 0
+
     section .apbootstrap
     bits 16
 
@@ -148,6 +151,24 @@ APLongMode:
     mov fs, ax
     mov gs, ax
     mov ss, ax
+
+    ;   Get local APIC ID
+    mov rax, 0x01
+    cpuid
+    shr rbx, 24
+    and rbx, 0xFF
+
+    ;   Get pointer to the stack
+    mov rax, rbx
+    imul rax, 8  ;   sizeof(AP_BOOTSTRAP_INFO)
+    mov rbx, [pAPBootstrapInfo]
+    add rbx, rax
+    mov rax, [rbx]
+    mov rsp, rax
+    mov rbp, rax
+
+    extern C_APBootstrap
+    call C_APBootstrap
 
     ;   Write some stuff to the frame buffer
     mov rcx, 0

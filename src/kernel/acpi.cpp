@@ -117,16 +117,19 @@ namespace ACPI
             }
             kout << DEC << "Found " << nCores << " logical processors\n";
 
+            pAPBootstrapInfo = new AP_BOOTSTRAP_INFO[nCores];
+            for(UINT8 APIC_ID = 0x00; APIC_ID < nCores; APIC_ID++)
+                pAPBootstrapInfo[APIC_ID].pStack = (UINT64)heap::MallocAligned(8192, 16) + 8192;
+
             /*
              * The Application Processors (APs) are going to need these for when they
              * bootstrap from 16-bit real mode to 64-bit long mode
              */
             UINT64 CR3Value;
             ASMx64::GetCR3Value(&CR3Value);
-            kout << "CR3Value: 0x" << HEX << CR3Value << "\n";
             ASMx64::CR3Value = CR3Value;
+
             UINT64 Vector = (UINT64)&ASMx64::APBootstrap >> 12;
-            kout << "Vector: 0x" << HEX << Vector << "\n";
 
             /*
              * Broadcast INIT Interprocessor Interrupt (IPI) to all APs
@@ -134,7 +137,6 @@ namespace ACPI
             SetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, APIC_REGISTER_ICR, 0x000C4500);
 
             //  TODO: If this don't work we gotta implement a sleep function and wait for 10ms here
-            kout << "Vector: 0x" << HEX << Vector << "\n";
 
             /*
              * Broadcast SIPI IPI to all APs where a vector 0x10 = address 0x100000, vector to bootstrap code
@@ -143,9 +145,18 @@ namespace ACPI
             SetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, APIC_REGISTER_ICR, 0x000C4600 | Vector);
 
             //  TODO: If it still don't work we gotta implement 200us sleep here
-            kout << "Vector: 0x" << HEX << Vector << "\n";
             SetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, APIC_REGISTER_ICR, 0x000C4600 | Vector);
         }
+    }
+
+    /*
+     * C entry point of the AP bootstrap routine
+     */
+    extern "C" void C_APBootstrap();
+    void C_APBootstrap()
+    {
+        log::kout << "OBAMA\n";
+        while(true);
     }
 
     UINT64 FindSDT(EXTENDED_SYSTEM_DESCRIPTOR_TABLE *XSDT, char *ID)
