@@ -1,8 +1,9 @@
 # Epochx64 Kernel Project - Version 0.01
 - UEFI booting, 64-bit
 - Exclusively ring 0
-- Multicore (almost)
+- Multicore
 ### Planned: 
 - GUI + 3D graphics
 - Filesystem
-- Some other things 
+- Networking
+- Some other things
