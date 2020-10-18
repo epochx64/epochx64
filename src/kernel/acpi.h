@@ -7,6 +7,7 @@
 #include <asm/asm.h>
 #include <lib/mem.h>
 #include <kernel/typedef.h>
+#include <kernel/scheduler.h>
 
 namespace ACPI
 {

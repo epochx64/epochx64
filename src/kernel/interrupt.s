@@ -219,13 +219,22 @@ ISR255:
 ISR48:
     extern TASK_INFOS
     extern ISR48APICTimerHandler
+    extern APICID
 
     push rax
+    push rbx
 
-    ;   TODO:   Eventaully this is going to be something like [rax + 8*CoreNumber] when multicore is implemented
-    ;           CTaskInfos is an array of pointers to TASK_INFO structs, one for every core
+    call APICID
+    mov rbx, rax
+
+    ; CTaskInfos is an array of pointers to TASK_INFO structs, one for every logical processor
     mov rax, [TASK_INFOS]
-    mov rax, [rax + 0]
+
+    imul rbx, 8
+    add rax, rbx
+    mov rax, [rax]
+
+    pop rbx
 
     ;   rax is now a pointer to a TASK_INFO struct
 
@@ -266,9 +275,14 @@ ISR48:
     call ISR48APICTimerHandler
 
     ;   Now restore the processor state
-    ;   TODO:   [rax + 0] will eventually be [rax + corenum]
+    call APICID
+    mov rbx, rax
+
     mov rax, [TASK_INFOS]
-    mov rax, [rax + 0]
+
+    imul rbx, 8
+    add rax, rbx
+    mov rax, [rax]
 
     fxrstor [rax + 0]
 

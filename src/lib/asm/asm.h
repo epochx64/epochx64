@@ -28,13 +28,14 @@ namespace ASMx64
     extern "C" void IOWait();
 
     extern "C" void ReadRFLAGS(UINT64 *RFLAGS);
-    extern "C" void EnableSSE();
+    extern "C" void EnableSSE(void *pSSEINFO);
 
     extern "C" void APBootstrap();
 
     extern "C" void GetCR3Value(UINT64 *Value);
     extern "C" UINT32 CR3Value;
-    extern "C" UINT64 pFramebuffer; //  Temporary
+
+    extern "C" UINT64 APICID();
 }
 
 

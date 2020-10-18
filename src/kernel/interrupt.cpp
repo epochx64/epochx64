@@ -59,12 +59,9 @@ namespace interrupt
         ASMx64::outb(0x20, 0x20);   //  End of interrupt
     }
 
-    //  TODO:   Calibrate APIC timer and add a msPerTick
-    UINT64 APICTick = 0;
-
     void ISR48APICTimerHandler(UINT64 RIP, UINT64 CS, UINT64 RFLAGS, UINT64 RSP)
     {
-        Scheduler0->Tick();
+        Schedulers[ASMx64::APICID()]->Tick();
 
         //  Signal End of Interrupt
         ACPI::SetLAPICRegister<UINT32>(kernel::KernelDescriptor.KernelACPIInfo.APICBase, 0x0B0, 0x00);

@@ -1,10 +1,15 @@
 #include "scheduler.h"
 
+namespace ACPI
+{
+    extern UINT64 nCores;
+}
+
 namespace scheduler
 {
     //  Temporary while the kernel is still single core. Eventually
     //  we will have an array of scheduler pointers
-    Scheduler *Scheduler0;
+    Scheduler **Schedulers;
 
     //  An array of TASK_INFO pointers
     //  Size will be number of cores
@@ -22,30 +27,17 @@ namespace scheduler
          */
         pTasks = new UINT64[64];
         CoreID = Core;
-
-        nTasks = Root ? 1 : 0;
+        nTasks = 1;
 
         /*
-         * If this scheduler is the root scheduler
+         * The idle task
          */
-        if(nTasks)
-        {
-            /*
-             * TODO: 1 will become the number of cores
-             */
-            UINT64 nCores = 1;
-            TASK_INFOS = (TASK_INFO**)(new UINT64[nCores]);
+        CurrentTask = new Task(0, true, nullptr);
+        CurrentTask->ID = 0;
+        CurrentTask->Enabled = true;
+        pTasks[0] = (UINT64)CurrentTask;
 
-            /*
-             * The kernel task, running right now
-             */
-            CurrentTask = new Task(0, true, nullptr);
-            CurrentTask->ID = 0;
-            CurrentTask->Enabled = true;
-            pTasks[0] = (UINT64)CurrentTask;
-
-            TASK_INFOS[0] = CurrentTask->pTaskInfo;
-        }
+        TASK_INFOS[CoreID] = CurrentTask->pTaskInfo;
     }
 
     void Scheduler::AddTask(Task *T)
@@ -70,15 +62,15 @@ namespace scheduler
 
         //  TODO:   Once we have access to dynamic memory outside of the heap these calls should change
         pTaskInfo   = (TASK_INFO *)heap::MallocAligned(sizeof(TASK_INFO), 16);
-        pStack      = (UINT64)heap::MallocAligned(STACK_SIZE, 16);
+        pStack      = (UINT64)heap::MallocAligned(STACK_SIZE, 16) + STACK_SIZE;
 
         /*
          * TODO:    When scheduler prepares a task, it needs to setup a new stack frame. When the task's
          *          main function returns, it needs to go to a special handler which signals to the scheduler
          *          that the task is over, and halts until it's killed
          */
-        pTaskInfo->rsp = (UINT64)pStack + 8192;
-        pTaskInfo->rbp = (UINT64)pStack + 8192;
+        pTaskInfo->rsp = (UINT64)pStack;
+        pTaskInfo->rbp = (UINT64)pStack;
         pTaskInfo->rdi = (UINT64)TaskArgs;
         pTaskInfo->IRETQCS = 0x08;
         pTaskInfo->IRETQRFLAGS = 0x206;

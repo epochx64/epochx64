@@ -149,7 +149,7 @@ namespace kernel
 
     typedef struct
     {
-        KERNEL_BOOT_INFO KernelBootInfo;
+        KERNEL_BOOT_INFO *KernelBootInfo;
         ACPI::KERNEL_ACPI_INFO KernelACPIInfo;
     } KERNEL_DESCRIPTOR;
 

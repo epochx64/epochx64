@@ -1,13 +1,51 @@
 #include "acpi.h"
 
+namespace kernel
+{
+    extern KERNEL_DESCRIPTOR KernelDescriptor;
+}
+
 namespace ACPI
 {
     using namespace log;
     bool x2APIC;
+    UINT64 nCores;
 
     /*
      * TODO:    This whole file is a bunch of spaghetti
      */
+
+    /*
+     * Temporary
+     */
+    void gfxroutine(scheduler::TASK_ARG *TaskArgs)
+    {
+        double x = *((double*)TaskArgs[0]);
+        double y = *((double*)TaskArgs[1]);
+        int radius = *((int*)TaskArgs[2]);
+
+        graphics::Color c(128, 192, 128, 0);
+
+        while (true)
+        {
+            using namespace graphics;
+            using namespace kernel;
+            using namespace math;
+
+            double divisions = 2400.0;
+            double dtheta = 2 * PI / divisions;
+
+            //  Draw a fat circle
+            for (double theta = 0.0; theta < 2*PI; theta += dtheta) {
+                for (int j = 0; j < radius; j++)
+                    PutPixel(x + j*cos(theta), y + j*sin(theta), &(KernelDescriptor.KernelBootInfo->FramebufferInfo), c);
+            }
+
+            c.u8_R += 10;
+            c.u8_G += 20;
+            c.u8_B += 10;
+        }
+    }
 
     void InitACPI(KERNEL_BOOT_INFO *KernelInfo, KERNEL_ACPI_INFO *KernelACPIInfo)
     {
@@ -23,7 +61,7 @@ namespace ACPI
     void InitAPIC(KERNEL_ACPI_INFO *KernelACPIInfo)
     {
         /*
-         * APIC setup for the Boostrap Processor (BSP)
+         * APIC setup for the Bootstrap Processor (BSP)
          */
         {
             using namespace ASMx64;
@@ -41,7 +79,6 @@ namespace ACPI
             //  Check APIC version
             UINT64 rax = 1, rbx = 0, rcx = 0, rdx = 0;
             cpuid(&rax, &rbx, &rcx, &rdx);
-            kout << "APIC Version: ";
 
             if(rcx & X2APIC_BIT)
             {
@@ -96,7 +133,7 @@ namespace ACPI
             /*
              * Parse the MADT to find all APICs
              */
-            UINT8 nCores = 0;
+            nCores = 0;
             auto Iterator = (UINT8*)((UINT64)pMADT + 0x2C);
 
             while(true)
@@ -116,6 +153,29 @@ namespace ACPI
                 Iterator += Size;
             }
             kout << DEC << "Found " << nCores << " logical processors\n";
+
+            /*
+             * Setup a scheduler before the APIC timer is enabled
+             * and add a couple of tasks
+             */
+            using namespace scheduler;
+
+            Schedulers = (Scheduler**)(new UINT64[nCores]);
+            TASK_INFOS = (TASK_INFO**)(new UINT64[nCores]);
+
+            for(UINT64 i = 0; i < nCores; i++)
+            {
+                Schedulers[i] = (Scheduler*)(new Scheduler(false, i));
+                Schedulers[i]->AddTask(new Task(
+                        (UINT64)&gfxroutine,
+                        true,
+                        new TASK_ARG[3] {
+                                (TASK_ARG)(new double(55.0 + 110*i)),
+                                (TASK_ARG)(new double(250.0)),
+                                (TASK_ARG)(new int(50))
+                        }
+                ));
+            }
 
             pAPBootstrapInfo = new AP_BOOTSTRAP_INFO[nCores];
             for(UINT8 APIC_ID = 0x00; APIC_ID < nCores; APIC_ID++)
@@ -155,8 +215,61 @@ namespace ACPI
     extern "C" void C_APBootstrap();
     void C_APBootstrap()
     {
-        log::kout << "OBAMA\n";
-        while(true);
+        auto KernelACPIInfo = &(kernel::KernelDescriptor.KernelACPIInfo);
+
+        ASMx64::EnableSSE(scheduler::Schedulers[ASMx64::APICID()]->CurrentTask->pTaskInfo);
+
+        /*
+         * Setup APIC
+         */
+        {
+            using namespace ASMx64;
+
+            //  Grab the APIC BASE MSR value
+            UINT64 MSRValue = 0;
+            ReadMSR(0x01B, &MSRValue);
+
+            //  Check APIC version
+            UINT64 rax = 1, rbx = 0, rcx = 0, rdx = 0;
+            cpuid(&rax, &rbx, &rcx, &rdx);
+
+            if(rcx & X2APIC_BIT)
+            {
+                //  Set x2APIC mode in APIC base MSR
+                MSRValue |= (1<<10);
+                SetMSR(0x01B, MSRValue);
+            }
+
+            //  Set the spurious interrupt vector register to vector 39
+            //  Set APIC enable bit
+            auto RegValue = GetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, 0xF0) | 0x100 | 0xFF;
+            SetLAPICRegister(KernelACPIInfo->APICBase, 0xF0, RegValue);
+        }
+
+        /*
+         *  Setup APIC timer
+         */
+        {
+            //  Setup Divide Configuration Register to divide by 1
+            auto APICDivideReg = GetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, 0x3E0);
+            APICDivideReg |= 0b00001011;
+            SetLAPICRegister(KernelACPIInfo->APICBase, 0x3E0, APICDivideReg);
+
+            //  Vector: 48, unmask, one-shot mode
+            auto APICTimerReg = GetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, 0x320) & (~0x000000FF);
+            APICTimerReg = (APICTimerReg | 0x00020000 | 48) & (~0x00050000);
+            SetLAPICRegister(KernelACPIInfo->APICBase, 0x320, APICTimerReg);
+
+            //  Set Initial Count Register
+            SetLAPICRegister(KernelACPIInfo->APICBase, 0x380, KernelACPIInfo->APICInitCount);
+        }
+
+        ASMx64::sti();
+
+        /*
+         * This is now an idle task
+         */
+        ASMx64::hlt();
     }
 
     UINT64 FindSDT(EXTENDED_SYSTEM_DESCRIPTOR_TABLE *XSDT, char *ID)

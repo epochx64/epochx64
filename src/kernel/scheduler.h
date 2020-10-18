@@ -48,18 +48,21 @@ namespace scheduler
 
         //  Array of Task*
         UINT64 *pTasks;
+
         Task *CurrentTask;
 
+        /*
+         * CoreID is the same as APICID
+         */
         UINT64 CoreID;
 
-        //  Returns task number
         void AddTask(Task *T);
 
         //  Executed every APIC tick
         void Tick();
     };
 
-    extern Scheduler *Scheduler0;
+    extern Scheduler **Schedulers;
     extern "C" TASK_INFO **TASK_INFOS;
 }
 

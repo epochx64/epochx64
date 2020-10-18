@@ -145,6 +145,8 @@ ProtectedMode:
 APLongMode:
     cli
 
+    lidt [IDTR64]
+
     mov ax, 0x10
     mov ds, ax
     mov es, ax
@@ -169,19 +171,6 @@ APLongMode:
 
     extern C_APBootstrap
     call C_APBootstrap
-
-    ;   Write some stuff to the frame buffer
-    mov rcx, 0
-    mov rax, [pFramebuffer]
-testloop:
-    mov dword [rax], 0xFFFFFFFF
-
-    inc rcx
-    add rax, 4
-
-    cmp rcx, 4096
-    jge halt
-    jmp testloop
 
 halt:
     hlt
@@ -221,6 +210,24 @@ cpuid:
     mov [rsi], rbx
     mov [r9], rcx
     mov [r8], rdx
+
+    ret
+
+    global APICID
+APICID:
+    push rbx
+    push rcx
+    push rdx
+
+    mov rax, 0x01
+    cpuid
+    shr rbx, 24
+    and rbx, 0xFF
+    mov rax, rbx
+
+    pop rdx
+    pop rcx
+    pop rbx
 
     ret
 
@@ -284,40 +291,33 @@ GetCR3Value:
 
     ret
 
-    section .bss
-    align 16
-SSEINFO: resb 512
-    section .text
-
 ;   Sets up floating point math
     global EnableSSE
 EnableSSE:
+    fninit
+
     ;   Enable floating point
     mov rax, cr0
-    mov rbx, 0xFFFFFFFFFFFFFFFB
-    and rax, rbx            ; Clear the EM flag
-    or rax, 0x00000002      ; Set the MP flag
+    and ax, 0xFFFB            ; Clear the EM flag
+    or ax, 0x2      ; Set the MP flag
     mov cr0, rax
 
     ;   Set OSFXSR, OSXMMEXCPT bits
     mov rax, cr4
     or rax, 3 << 9
-
-    ;   OSXSAVE bit
-    ;or rax, 1 << 18
-    ;mov cr4, rax
+    mov cr4, rax
 
     ;   Save the current FPU state
-    fxsave [SSEINFO]
+    fxsave [rdi]
 
     ;   Grab the MXCSR value
-    mov eax, [SSEINFO + 0x18]
+    mov eax, [rdi + 0x18]
 
     ;   Mask all floating point exeptions
     or eax, 0x00001F80
-    mov [SSEINFO + 0x18], eax
+    mov [rdi + 0x18], eax
 
-    fxrstor [SSEINFO]
+    fxrstor [rdi]
 
     ret
 
