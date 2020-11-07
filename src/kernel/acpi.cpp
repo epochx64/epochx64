@@ -1,10 +1,5 @@
 #include "acpi.h"
 
-namespace kernel
-{
-    extern KERNEL_DESCRIPTOR KernelDescriptor;
-}
-
 namespace ACPI
 {
     using namespace log;
@@ -38,7 +33,7 @@ namespace ACPI
             //  Draw a fat circle
             for (double theta = 0.0; theta < 2*PI; theta += dtheta) {
                 for (int j = 0; j < radius; j++)
-                    PutPixel(x + j*cos(theta), y + j*sin(theta), &(KernelDescriptor.KernelBootInfo->FramebufferInfo), c);
+                    PutPixel(x + j*cos(theta), y + j*sin(theta), &(KernelDescriptor->GOPInfo), c);
             }
 
             c.u8_R += 10;
@@ -47,19 +42,22 @@ namespace ACPI
         }
     }
 
-    void InitACPI(KERNEL_BOOT_INFO *KernelInfo, KERNEL_ACPI_INFO *KernelACPIInfo)
+    void InitACPI()
     {
-        KernelACPIInfo->RSDPDescriptor = (RSDP_DESCRIPTOR*)(KernelInfo->RSDP);
+        using namespace kernel;
 
-        auto pXSDT = (EXTENDED_SYSTEM_DESCRIPTOR_TABLE*)(KernelACPIInfo->RSDPDescriptor->XSDTAddress);
-        KernelACPIInfo->XSDT = pXSDT;
-        if(pXSDT != nullptr) kout << "XSDT Address: 0x" << HEX << (UINT64)pXSDT << "\n";
+        auto RSDPDescriptor = (RSDP_DESCRIPTOR*)(KernelDescriptor->pRSDP);
+        auto pXSDT = RSDPDescriptor->XSDTAddress;
 
-        InitAPIC(KernelACPIInfo);
+        KernelDescriptor->pXSDT = (UINT64)pXSDT;
+        if(pXSDT != 0) kout << "XSDT Address: 0x" << HEX << (UINT64)pXSDT << "\n";
+
+        InitAPIC();
     }
 
-    void InitAPIC(KERNEL_ACPI_INFO *KernelACPIInfo)
+    void InitAPIC()
     {
+        using namespace kernel;
         /*
          * APIC setup for the Bootstrap Processor (BSP)
          */
@@ -91,15 +89,15 @@ namespace ACPI
             }
             else
             {
-                KernelACPIInfo->APICBase = MSRValue & 0x0000000FFFFFF000;
+                KernelDescriptor->APICBase = MSRValue & 0x0000000FFFFFF000;
 
                 kout << "xAPIC\n";
             }
 
             //  Set the spurious interrupt vector register to vector 39
             //  Set APIC enable bit
-            auto RegValue = GetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, 0xF0) | 0x100 | 0xFF;
-            SetLAPICRegister(KernelACPIInfo->APICBase, 0xF0, RegValue);
+            auto RegValue = GetLAPICRegister<UINT32>(KernelDescriptor->APICBase, 0xF0) | 0x100 | 0xFF;
+            SetLAPICRegister(KernelDescriptor->APICBase, 0xF0, RegValue);
         }
 
         /*
@@ -107,27 +105,30 @@ namespace ACPI
          */
         {
             //  Setup Divide Configuration Register to divide by 1
-            auto APICDivideReg = GetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, 0x3E0);
+            auto APICDivideReg = GetLAPICRegister<UINT32>(KernelDescriptor->APICBase, 0x3E0);
                  APICDivideReg |= 0b00001011;
-            SetLAPICRegister(KernelACPIInfo->APICBase, 0x3E0, APICDivideReg);
+            SetLAPICRegister(KernelDescriptor->APICBase, 0x3E0, APICDivideReg);
 
             //  Vector: 48, unmask, one-shot mode
-            auto APICTimerReg = GetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, 0x320) & (~0x000000FF);
+            auto APICTimerReg = GetLAPICRegister<UINT32>(KernelDescriptor->APICBase, 0x320) & (~0x000000FF);
                  APICTimerReg = (APICTimerReg | 0x00020000 | 48) & (~0x00050000);
-            SetLAPICRegister(KernelACPIInfo->APICBase, 0x320, APICTimerReg);
+            SetLAPICRegister(KernelDescriptor->APICBase, 0x320, APICTimerReg);
 
             kout << "APICTimerReg 0x" << HEX << APICTimerReg << "\n";
 
             //  Set Initial Count Register
-            KernelACPIInfo->APICInitCount = 0x0010000;
-            SetLAPICRegister(KernelACPIInfo->APICBase, 0x380, KernelACPIInfo->APICInitCount);
+            KernelDescriptor->APICInitCount = 0x0010000;
+            SetLAPICRegister(KernelDescriptor->APICBase, 0x380, KernelDescriptor->APICInitCount);
         }
 
         /*
          * Multicore bootstrap
          */
         {
-            auto pMADT = (MULTIPLE_APIC_DESCRIPTOR_TABLE*) FindSDT(KernelACPIInfo->XSDT, "APIC");
+            auto pMADT =(MULTIPLE_APIC_DESCRIPTOR_TABLE*) FindSDT(
+                    (EXTENDED_SYSTEM_DESCRIPTOR_TABLE *)KernelDescriptor->pXSDT,
+                    "APIC"
+                    );
             kout << "MADT Address: 0x" << HEX << (UINT64)pMADT << "\n";
 
             /*
@@ -194,7 +195,7 @@ namespace ACPI
             /*
              * Broadcast INIT Interprocessor Interrupt (IPI) to all APs
              */
-            SetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, APIC_REGISTER_ICR, 0x000C4500);
+            SetLAPICRegister<UINT32>(KernelDescriptor->APICBase, APIC_REGISTER_ICR, 0x000C4500);
 
             //  TODO: If this don't work we gotta implement a sleep function and wait for 10ms here
 
@@ -202,10 +203,10 @@ namespace ACPI
              * Broadcast SIPI IPI to all APs where a vector 0x10 = address 0x100000, vector to bootstrap code
              * We have to do it twice for some reason
              */
-            SetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, APIC_REGISTER_ICR, 0x000C4600 | Vector);
+            SetLAPICRegister<UINT32>(KernelDescriptor->APICBase, APIC_REGISTER_ICR, 0x000C4600 | Vector);
 
             //  TODO: If it still don't work we gotta implement 200us sleep here
-            SetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, APIC_REGISTER_ICR, 0x000C4600 | Vector);
+            SetLAPICRegister<UINT32>(KernelDescriptor->APICBase, APIC_REGISTER_ICR, 0x000C4600 | Vector);
         }
     }
 
@@ -215,9 +216,9 @@ namespace ACPI
     extern "C" void C_APBootstrap();
     void C_APBootstrap()
     {
-        auto KernelACPIInfo = &(kernel::KernelDescriptor.KernelACPIInfo);
-
         ASMx64::EnableSSE(scheduler::Schedulers[ASMx64::APICID()]->CurrentTask->pTaskInfo);
+
+        using namespace kernel;
 
         /*
          * Setup APIC
@@ -242,8 +243,8 @@ namespace ACPI
 
             //  Set the spurious interrupt vector register to vector 39
             //  Set APIC enable bit
-            auto RegValue = GetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, 0xF0) | 0x100 | 0xFF;
-            SetLAPICRegister(KernelACPIInfo->APICBase, 0xF0, RegValue);
+            auto RegValue = GetLAPICRegister<UINT32>(KernelDescriptor->APICBase, 0xF0) | 0x100 | 0xFF;
+            SetLAPICRegister(KernelDescriptor->APICBase, 0xF0, RegValue);
         }
 
         /*
@@ -251,17 +252,17 @@ namespace ACPI
          */
         {
             //  Setup Divide Configuration Register to divide by 1
-            auto APICDivideReg = GetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, 0x3E0);
+            auto APICDivideReg = GetLAPICRegister<UINT32>(KernelDescriptor->APICBase, 0x3E0);
             APICDivideReg |= 0b00001011;
-            SetLAPICRegister(KernelACPIInfo->APICBase, 0x3E0, APICDivideReg);
+            SetLAPICRegister(KernelDescriptor->APICBase, 0x3E0, APICDivideReg);
 
             //  Vector: 48, unmask, one-shot mode
-            auto APICTimerReg = GetLAPICRegister<UINT32>(KernelACPIInfo->APICBase, 0x320) & (~0x000000FF);
+            auto APICTimerReg = GetLAPICRegister<UINT32>(KernelDescriptor->APICBase, 0x320) & (~0x000000FF);
             APICTimerReg = (APICTimerReg | 0x00020000 | 48) & (~0x00050000);
-            SetLAPICRegister(KernelACPIInfo->APICBase, 0x320, APICTimerReg);
+            SetLAPICRegister(KernelDescriptor->APICBase, 0x320, APICTimerReg);
 
             //  Set Initial Count Register
-            SetLAPICRegister(KernelACPIInfo->APICBase, 0x380, KernelACPIInfo->APICInitCount);
+            SetLAPICRegister(KernelDescriptor->APICBase, 0x380, KernelDescriptor->APICInitCount);
         }
 
         ASMx64::sti();

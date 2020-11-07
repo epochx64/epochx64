@@ -14,9 +14,9 @@ namespace ACPI
     extern bool x2APIC;
     extern "C" AP_BOOTSTRAP_INFO *pAPBootstrapInfo;
 
-    void InitACPI(KERNEL_BOOT_INFO *KernelInfo, KERNEL_ACPI_INFO *KernelACPIInfo);
+    void InitACPI();
 
-    void InitAPIC(KERNEL_ACPI_INFO *KernelACPIInfo);
+    void InitAPIC();
 
     /*
      * These depend on the value of bool x2APIC

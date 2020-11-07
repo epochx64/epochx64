@@ -3,6 +3,7 @@
 
 #include <defs/int.h>
 #include <boot/boot.h>
+#include <boot/shared_boot_defs.h>
 
 namespace interrupt
 {
@@ -137,9 +138,6 @@ namespace ACPI
     {
         RSDP_DESCRIPTOR *RSDPDescriptor;
         EXTENDED_SYSTEM_DESCRIPTOR_TABLE *XSDT;
-
-        UINT32 APICBase;
-        UINT32 APICInitCount;
     } KERNEL_ACPI_INFO;
 }
 
@@ -147,13 +145,7 @@ namespace kernel
 {
     #define FRAMEBUFFER_BYTES_PER_PIXEL 4
 
-    typedef struct
-    {
-        KERNEL_BOOT_INFO *KernelBootInfo;
-        ACPI::KERNEL_ACPI_INFO KernelACPIInfo;
-    } KERNEL_DESCRIPTOR;
-
-    extern KERNEL_DESCRIPTOR KernelDescriptor;
+    extern KERNEL_DESCRIPTOR *KernelDescriptor;
 }
 
 namespace scheduler

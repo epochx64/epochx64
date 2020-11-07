@@ -56,7 +56,7 @@ GDT32:                           ; Global Descriptor Table (32-bit).
     dw 0                         ; Base (low).
     db 0                         ; Base (middle)
     db 10011010b                 ; Access (exec/read).
-    db 11001111b                 ; Granularity, 64 bits flag, limit19:16. OLD VALUE: 10101111b
+    db 11001111b                 ; Granularity, limit19:16.
     db 0                         ; Base (high).
 .Data: equ $ - GDT32         ; The data descriptor.
     dw 0xFFFF                    ; Limit (low).
@@ -72,9 +72,6 @@ GDTR32:                          ; The GDT-pointer.
 
     global CR3Value
 CR3Value: dd 0
-
-    global pFramebuffer
-pFramebuffer: dq 0
 
     global pAPBootstrapInfo
 pAPBootstrapInfo: dq 0
@@ -160,7 +157,7 @@ APLongMode:
     shr rbx, 24
     and rbx, 0xFF
 
-    ;   Get pointer to the stack
+    ;   Get pointer to the stack using APIC ID
     mov rax, rbx
     imul rax, 8  ;   sizeof(AP_BOOTSTRAP_INFO)
     mov rbx, [pAPBootstrapInfo]

@@ -2,20 +2,19 @@
 
 namespace kernel
 {
-    KERNEL_BOOT_INFO *KernelBootInfo;
-    KERNEL_DESCRIPTOR KernelDescriptor;
+    KERNEL_DESCRIPTOR *KernelDescriptor;
 }
 
-void KernelMain(KERNEL_BOOT_INFO *KernelInfo)
+void KernelMain(KERNEL_DESCRIPTOR *KernelInfo)
 {
     using namespace kernel;
+
+    KernelDescriptor = new KERNEL_DESCRIPTOR;
+    mem::copy((byte*)KernelInfo, (byte*)KernelDescriptor, sizeof(KERNEL_DESCRIPTOR));
 
     /*
      * Setup IDT, SSE, PIT, and PS2
      */
-    KernelBootInfo = new KERNEL_BOOT_INFO;
-    mem::copy((byte*)KernelInfo, (byte*)KernelBootInfo, sizeof(KERNEL_BOOT_INFO));
-    KernelDescriptor.KernelBootInfo = KernelBootInfo;
     {
         using namespace interrupt;
         using namespace ASMx64;
@@ -33,7 +32,7 @@ void KernelMain(KERNEL_BOOT_INFO *KernelInfo)
     /*
      *  So far this only initializes APIC timer
      */
-    ACPI::InitACPI(KernelBootInfo, &(KernelDescriptor.KernelACPIInfo));
+    ACPI::InitACPI();
 
     ASMx64::sti();
 
@@ -42,14 +41,4 @@ void KernelMain(KERNEL_BOOT_INFO *KernelInfo)
      * This is now an idle task
      */
     ASMx64::hlt();
-
-    /*
-     * Test graphics routine (draws a circle)
-     * TODO: Double buffering
-     */
-    //gfxroutine(new scheduler::TASK_ARG[3] {
-    //    (TASK_ARG)(new double(500.0)),
-    //    (TASK_ARG)(new double(500.0)),
-    //    (TASK_ARG)(new int(100))
-    //});
 }

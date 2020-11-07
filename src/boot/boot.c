@@ -8,7 +8,7 @@
 #include <elf.h>
 #include <boot/boot.h>
 
-typedef __attribute__((sysv_abi)) void (*KERNEL_ENTRY)(KERNEL_BOOT_INFO*);
+typedef __attribute__((sysv_abi)) void (*KERNEL_ENTRY)(KERNEL_DESCRIPTOR*);
 
 UINT64 StrLen(char *str)
 {
@@ -44,9 +44,13 @@ int GuidCmp(EFI_GUID GuidA, EFI_GUID GuidB, UINT64 len)
     return 1;
 }
 
-void to_hex(UINT64 num, char* buf)
+wchar_t *to_hex(EFI_ALLOCATE_POOL AllocatePool, UINT64 num)
 {
-    UINT8 hex_size = sizeof(num) * 2;
+    UINTN hex_size = sizeof(num) * 2;
+
+    wchar_t *buf;
+    AllocatePool(EfiLoaderData, hex_size*2+1, (void**)&buf);
+    MemSet(buf, 0x00, hex_size*2+1);
 
     for ( uint8_t i = 0; i < hex_size; i++ )
     {
@@ -61,35 +65,23 @@ void to_hex(UINT64 num, char* buf)
 
     //  Null terminate
     buf[hex_size] = 0;
+
+    return buf;
 }
 
 EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
     EFI_STATUS Status;
+    KERNEL_DESCRIPTOR KernelInfo;
 
+    EFI_FREE_POOL FreePool = SystemTable->BootServices->FreePool;
     EFI_TEXT_STRING OutputString =  SystemTable->ConOut->OutputString;
     EFI_ALLOCATE_POOL AllocatePool = SystemTable->BootServices->AllocatePool;
     EFI_GET_MEMORY_MAP GetMemoryMap = SystemTable->BootServices->GetMemoryMap;
     EFI_ALLOCATE_PAGES AllocatePages = SystemTable->BootServices->AllocatePages;
     EFI_HANDLE_PROTOCOL HandleProtocol = SystemTable->BootServices->HandleProtocol;
 
-    OutputString(SystemTable->ConOut, L"IN UEFI LAND\n\r");
-
-    /*  Get memory map information  */
-    KERNEL_BOOT_INFO KernelInfo;
-    {
-        UINTN *MapKey = &(KernelInfo.MapKey);
-        UINTN *MemoryMapSize = &(KernelInfo.MemoryMapSize);
-        UINTN *DescriptorSize = &(KernelInfo.DescriptorSize);
-        UINT32 *DescriptorVersion = &(KernelInfo.DescriptorVersion);
-
-        //  GetMemoryMap without a NULL buffer will set MemoryMapSize
-        GetMemoryMap(MemoryMapSize, NULL, MapKey, DescriptorSize, DescriptorVersion);
-        AllocatePool(EfiLoaderData, *MemoryMapSize, (void**)&(KernelInfo.MemoryMap));
-
-        GetMemoryMap(MemoryMapSize, (EFI_MEMORY_DESCRIPTOR*)(KernelInfo.MemoryMap),
-                MapKey, DescriptorSize, DescriptorVersion);
-    }
+    OutputString(SystemTable->ConOut, L"In UEFI land\n\r");
 
     /*  Get framebuffer info and set video mode */
     FRAMEBUFFER_INFO FramebufferInfo;
@@ -139,7 +131,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         FramebufferInfo.Width           = GOPProtocol->Mode->Info->HorizontalResolution;
         FramebufferInfo.Pitch           = GOPProtocol->Mode->Info->PixelsPerScanLine*4;
 
-        KernelInfo.FramebufferInfo = FramebufferInfo;
+        KernelInfo.GOPInfo = FramebufferInfo;
     }
 
     /*  Get ACPI info and stuff into KERNEL_INFO */
@@ -152,7 +144,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             EFI_CONFIGURATION_TABLE *Config = &(SystemTable->ConfigurationTable[i]);
             if(!GuidCmp(Config->VendorGuid, ACPIGUID, sizeof(Config->VendorGuid))) continue;
 
-            KernelInfo.RSDP = (UINT64)Config->VendorTable;
+            KernelInfo.pRSDP = (UINT64)Config->VendorTable;
             break;
         }
     }
@@ -197,11 +189,10 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     }
 
     /*
-     * - Next we parse the ELF header from the buffer,
-     * - Load all its sections into their corresponding memory locations.
-     * - We'll then grab function pointer to its entry point
+     * Next we parse the ELF header from the buffer,
+     * Load all its sections into their corresponding memory locations.
+     * We'll then grab function pointer to its entry point
      */
-    OutputString(SystemTable->ConOut, L"KERNEL IMAGE LOADED\n\r");
 
     KERNEL_ENTRY KernelEntry;
     {
@@ -253,11 +244,61 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         }
     }
 
-    OutputString(SystemTable->ConOut, L"KERNEL SECTIONS IN RAM\n\r");
+    /*  Get memory map, signal that we're done bootstrapping and jump to the kernel entry point */
+    OutputString(SystemTable->ConOut, L"Kernel image loaded into RAM\n\r");
 
-    /*  Signal that we're done bootstrapping and jump to the kernel entry point */
-    OutputString(SystemTable->ConOut, L"CALLING KERNEL\n\r");
-    SystemTable->BootServices->ExitBootServices(ImageHandle, KernelInfo.MapKey);
+    UINTN *MapKey = &(KernelInfo.MapKey);
+    {
+        UINTN *MemoryMapSize = &(KernelInfo.MemoryMapSize);
+        UINTN *DescriptorSize = &(KernelInfo.DescriptorSize);
+        UINT32 *DescriptorVersion = &(KernelInfo.DescriptorVersion);
+
+        while(1)
+        {
+            *MemoryMapSize = 0;
+            //  GetMemoryMap with a NULL buffer will set MemoryMapSize
+            GetMemoryMap(
+                    MemoryMapSize,
+                    NULL,
+                    MapKey,
+                    DescriptorSize,
+                    DescriptorVersion
+            );
+
+            //  Now that we have the size, we allocate memory for it
+            AllocatePool(EfiLoaderData,*MemoryMapSize + 2*(*DescriptorSize),(void**)&(KernelInfo.MemoryMap));
+
+            //  This time it will actually give the memory map
+            EFI_STATUS Result = GetMemoryMap(
+                    MemoryMapSize,
+                    (EFI_MEMORY_DESCRIPTOR*)(KernelInfo.MemoryMap),
+                    MapKey,
+                    DescriptorSize,
+                    DescriptorVersion
+            );
+
+            //  Sometimes GetMemoryMap fails even with the "correct" size, so we have to loop until it works
+            if(Result != EFI_BUFFER_TOO_SMALL) break;
+
+            FreePool(KernelInfo.MemoryMap);
+        }
+
+        for (
+                EFI_MEMORY_DESCRIPTOR *MemDescriptor = (EFI_MEMORY_DESCRIPTOR*)(KernelInfo.MemoryMap);
+                (UINT64)MemDescriptor < (UINT64)(KernelInfo.MemoryMap)+(*MemoryMapSize);
+                MemDescriptor = (EFI_MEMORY_DESCRIPTOR*)((UINT64)MemDescriptor + (*DescriptorSize)))
+        {
+            OutputString(SystemTable->ConOut, L"0x");
+            OutputString(SystemTable->ConOut, to_hex(AllocatePool, MemDescriptor->PhysicalStart));
+            OutputString(SystemTable->ConOut, L" has 0x");
+            OutputString(SystemTable->ConOut, to_hex(AllocatePool, MemDescriptor->NumberOfPages));
+            OutputString(SystemTable->ConOut, L" pages\n\r");
+        }
+    }
+
+    OutputString(SystemTable->ConOut, L"Calling kernel\n\r");
+
+    SystemTable->BootServices->ExitBootServices(ImageHandle, *MapKey);
     KernelEntry(&KernelInfo);
 
     return Status;

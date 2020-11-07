@@ -64,7 +64,7 @@ namespace interrupt
         Schedulers[ASMx64::APICID()]->Tick();
 
         //  Signal End of Interrupt
-        ACPI::SetLAPICRegister<UINT32>(kernel::KernelDescriptor.KernelACPIInfo.APICBase, 0x0B0, 0x00);
+        ACPI::SetLAPICRegister<UINT32>(kernel::KernelDescriptor->APICBase, 0x0B0, 0x00);
     }
 
     void ISR33KeyboardHandler()
