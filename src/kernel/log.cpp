@@ -83,7 +83,7 @@ namespace log
             pixel_address += KernelDescriptor->GOPInfo.Pitch;
         }
 
-        if(++k_tty_col > KernelDescriptor->GOPInfo.Width / 8)
+        if(++k_tty_col >= KernelDescriptor->GOPInfo.Width / 8)
         {
             k_tty_col = 0;
             k_tty_lin = (k_tty_lin + 1) % (KernelDescriptor->GOPInfo.Height/16 - 1);
