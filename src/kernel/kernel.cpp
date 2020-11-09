@@ -11,7 +11,10 @@ void KernelMain(KERNEL_DESCRIPTOR *KernelInfo)
 
     KernelDescriptor = new KERNEL_DESCRIPTOR;
     mem::copy((byte*)KernelInfo, (byte*)KernelDescriptor, sizeof(KERNEL_DESCRIPTOR));
+    log::kout.pFramebufferInfo = &(KernelDescriptor->GOPInfo);
 
+    auto pKernelWindow = new GUI::Window(500, 100, 350, 600);
+    pKernelWindow->Draw();
     /*
      * Setup IDT, SSE, PIT, and PS2
      */
@@ -29,9 +32,6 @@ void KernelMain(KERNEL_DESCRIPTOR *KernelInfo)
         InitPIT();
     }
 
-    /*
-     *  So far this only initializes APIC timer
-     */
     ACPI::InitACPI();
 
     ASMx64::sti();

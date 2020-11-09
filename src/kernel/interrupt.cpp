@@ -179,38 +179,6 @@ namespace PIC
         while(inb(0x64) & 2);
         outb(PS2_COMMAND_PORT, 0xAD);
 
-        //  Mouse stuff
-        {
-            //  Enable mouse (aux port)
-            while(inb(0x64) & 2);
-            outb(PS2_COMMAND_PORT, 0xA8);
-
-            //  Enable mouse interrupts
-            while(inb(0x64) & 2);
-            outb(PS2_COMMAND_PORT, 0x20);
-
-            UINT8 CompaqStatus = PS2Read();
-            CompaqStatus = (CompaqStatus | 0b00000010) & (~0b00100000);
-
-            while(inb(0x64) & 2);
-            outb(PS2_COMMAND_PORT, 0x60);
-            PS2Write(0x60, CompaqStatus);
-
-            //  Set mouse settings
-            while(inb(0x64) & 2);
-            outb(PS2_COMMAND_PORT, 0xD4);
-
-            PS2Write(0x60, 0xF6);
-            PS2Read();  //  Acknowledge
-
-            //  Enable mouse enable mouse
-            while(inb(0x64) & 2);
-            outb(PS2_COMMAND_PORT, 0xD4);
-
-            PS2Write(0x60, 0xF4);
-            PS2Read();  //  Acknowledge
-        }
-
         //  Keyboard stuff
         {
             //  Flush output buffer

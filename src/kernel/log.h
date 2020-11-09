@@ -90,14 +90,16 @@ namespace log
     public:
         krnlout();
 
-        static uint16_t k_tty_col;
-        static uint16_t k_tty_lin;
+        uint16_t k_tty_col;
+        uint16_t k_tty_lin;
 
         /*
          * 0 : Hex
          * 1 : Dec
          */
         UINT8 NumberBase;
+
+        FRAMEBUFFER_INFO *pFramebufferInfo;
 
         /*
          * Example usage:

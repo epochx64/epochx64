@@ -5,6 +5,20 @@
 
 namespace math
 {
+    template<class T>
+    class Vec2
+    {
+    public:
+        Vec2(T x, T y)
+        {
+            X = x;
+            Y = y;
+        }
+
+        T X;
+        T Y;
+    };
+
 #define PI 3.14159265357
     /***
      * Only use floats or doubles

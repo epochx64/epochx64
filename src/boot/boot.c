@@ -282,18 +282,6 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
             FreePool(KernelInfo.MemoryMap);
         }
-
-        for (
-                EFI_MEMORY_DESCRIPTOR *MemDescriptor = (EFI_MEMORY_DESCRIPTOR*)(KernelInfo.MemoryMap);
-                (UINT64)MemDescriptor < (UINT64)(KernelInfo.MemoryMap)+(*MemoryMapSize);
-                MemDescriptor = (EFI_MEMORY_DESCRIPTOR*)((UINT64)MemDescriptor + (*DescriptorSize)))
-        {
-            OutputString(SystemTable->ConOut, L"0x");
-            OutputString(SystemTable->ConOut, to_hex(AllocatePool, MemDescriptor->PhysicalStart));
-            OutputString(SystemTable->ConOut, L" has 0x");
-            OutputString(SystemTable->ConOut, to_hex(AllocatePool, MemDescriptor->NumberOfPages));
-            OutputString(SystemTable->ConOut, L" pages\n\r");
-        }
     }
 
     OutputString(SystemTable->ConOut, L"Calling kernel\n\r");

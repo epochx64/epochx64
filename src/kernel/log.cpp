@@ -1,17 +1,14 @@
 #include "log.h"
 
-namespace kernel
-{
-    extern KERNEL_DESCRIPTOR *KernelDescriptor;
-}
-
 namespace log
 {
     dbgout::dbgout() { NumberBase = HEX_ID; }
-    krnlout::krnlout() { NumberBase = HEX_ID; }
-
-    uint16_t krnlout::k_tty_lin = 0;
-    uint16_t krnlout::k_tty_col = 0;
+    krnlout::krnlout()
+    {
+        NumberBase = HEX_ID;
+        k_tty_lin = 0;
+        k_tty_col = 0;
+    }
 
     krnlout kout;
     dbgout dout;
@@ -44,7 +41,7 @@ namespace log
                 k_tty_col = 0;
 
                 //  We don't want to go out of the screen
-                k_tty_lin = (k_tty_lin + 1) % (KernelDescriptor->GOPInfo.Height/16 - 1);
+                k_tty_lin = (k_tty_lin + 1) % (pFramebufferInfo->Height/16 - 1);
                 return;
 
                 //This is temporary
@@ -62,7 +59,7 @@ namespace log
                 return;
         }
 
-        auto pixel_address = (uint64_t)(KernelDescriptor->GOPInfo.pFrameBuffer + 16*k_tty_lin*(KernelDescriptor->GOPInfo.Pitch) + k_tty_col*4*8);
+        auto pixel_address = (uint64_t)(pFramebufferInfo->pFrameBuffer + 16*k_tty_lin*(pFramebufferInfo->Pitch) + k_tty_col*4*8);
 
         for(size_t i = 0; i < 16; i++)
         {
@@ -80,13 +77,13 @@ namespace log
                 *((uint32_t*)(pixel_address + 4*j)) = pixel_color.To_VBE_Word();
             }
 
-            pixel_address += KernelDescriptor->GOPInfo.Pitch;
+            pixel_address += pFramebufferInfo->Pitch;
         }
 
-        if(++k_tty_col >= KernelDescriptor->GOPInfo.Width / 8)
+        if(++k_tty_col >= pFramebufferInfo->Width / 8)
         {
             k_tty_col = 0;
-            k_tty_lin = (k_tty_lin + 1) % (KernelDescriptor->GOPInfo.Height/16 - 1);
+            k_tty_lin = (k_tty_lin + 1) % (pFramebufferInfo->Height/16 - 1);
         }
     }
 

@@ -8,6 +8,8 @@
 #include <kernel/interrupt.h>
 #include <kernel/acpi.h>
 #include <kernel/log.h>
+#include <boot/shared_boot_defs.h>
+#include <kernel/gui/window.h>
 
 extern "C" void KernelMain(KERNEL_DESCRIPTOR*);
 

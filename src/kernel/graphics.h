@@ -30,11 +30,6 @@ namespace graphics
         uint8_t u8_A;
     };
 
-    class Window
-    {
-
-    };
-
     static void FORCE_INLINE PutPixel (
             uint32_t                    x,
             uint32_t                    y,
