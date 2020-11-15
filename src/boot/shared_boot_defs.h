@@ -49,14 +49,33 @@ typedef struct
 
 typedef struct
 {
+    UINT16  Year;           //  1900-9999
+    UINT8   Month;          //  1-12
+    UINT8   Day;            //  1-31
+    UINT8   Hour;           //  0-23
+    UINT8   Minute;         //  0-59
+    UINT8   Second;         //  0-59
+    UINT8   Pad1;
+    UINT32  NanoSecond;     //  0-999,999,999
+    INT16   TimeZone;       //  -1440 - 1440 or 2047
+    UINT8   Daylight;
+    UINT8   Pad2;
+} EFI_TIME_DESCRIPTOR;
+
+typedef struct
+{
     UINTN MemoryMapSize;
     UINTN DescriptorSize;
     UINTN MapKey;
     UINT32 DescriptorVersion;
     EFI_MEM_DESCRIPTOR  *MemoryMap;
+    EFI_TIME_DESCRIPTOR TimeDescriptor;
 
     FRAMEBUFFER_INFO GOPInfo;
     FRAMEBUFFER_INFO KernelLog;
+
+    UINT64 pSysMemory;
+    UINT64 SysMemorySize;
 
     UINT64 pRSDP;
     UINT64 pXSDT;

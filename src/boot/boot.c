@@ -44,42 +44,19 @@ int GuidCmp(EFI_GUID GuidA, EFI_GUID GuidB, UINT64 len)
     return 1;
 }
 
-wchar_t *to_hex(EFI_ALLOCATE_POOL AllocatePool, UINT64 num)
-{
-    UINTN hex_size = sizeof(num) * 2;
-
-    wchar_t *buf;
-    AllocatePool(EfiLoaderData, hex_size*2+1, (void**)&buf);
-    MemSet(buf, 0x00, hex_size*2+1);
-
-    for ( uint8_t i = 0; i < hex_size; i++ )
-    {
-        UINT8 c = (UINT8)(num >> (4*i)) & 0x0F;
-
-        //  ASCII conversion; capital
-        if ( c > 9 ) c += 7;
-        c += '0';
-
-        buf[hex_size - (i+1)] = c;
-    }
-
-    //  Null terminate
-    buf[hex_size] = 0;
-
-    return buf;
-}
-
 EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
     EFI_STATUS Status;
     KERNEL_DESCRIPTOR KernelInfo;
 
+    EFI_GET_TIME GetTime = SystemTable->RuntimeServices->GetTime;
     EFI_FREE_POOL FreePool = SystemTable->BootServices->FreePool;
     EFI_TEXT_STRING OutputString =  SystemTable->ConOut->OutputString;
     EFI_ALLOCATE_POOL AllocatePool = SystemTable->BootServices->AllocatePool;
     EFI_GET_MEMORY_MAP GetMemoryMap = SystemTable->BootServices->GetMemoryMap;
     EFI_ALLOCATE_PAGES AllocatePages = SystemTable->BootServices->AllocatePages;
     EFI_HANDLE_PROTOCOL HandleProtocol = SystemTable->BootServices->HandleProtocol;
+    EFI_SET_VIRTUAL_ADDRESS_MAP SetVirtualAddressMap = SystemTable->RuntimeServices->SetVirtualAddressMap;
 
     OutputString(SystemTable->ConOut, L"In UEFI land\n\r");
 
@@ -193,7 +170,6 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
      * Load all its sections into their corresponding memory locations.
      * We'll then grab function pointer to its entry point
      */
-
     KERNEL_ENTRY KernelEntry;
     {
         Elf64_Ehdr *EHdr = (Elf64_Ehdr *)KernelBuffer;
@@ -219,10 +195,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         }
 
         /*
-         * If BSS section location in memory is not zeroed, static and global
-         * variables do not initialize properly. If they are initialized with 0,
-         * for some reason they are filled with garbage data. Any nonzero value works
-         * which is bizarre
+         * Zero out the BSS section
          */
         UINT64 pSectionHeaders = (UINT64)EHdr + EHdr->e_shoff;
         for
@@ -284,9 +257,48 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         }
     }
 
-    OutputString(SystemTable->ConOut, L"Calling kernel\n\r");
+    Status = SystemTable->BootServices->ExitBootServices(ImageHandle, *MapKey);
+    if(EFI_ERROR(Status)) while(1);
 
-    SystemTable->BootServices->ExitBootServices(ImageHandle, *MapKey);
+    /*
+     * Find all free memory and map it to 0xFFFFFFFF80000000
+     */
+    {
+        KernelInfo.pSysMemory = 0x000100000000;
+        UINT64 SysMemoryIterator = KernelInfo.pSysMemory;
+
+        for(EFI_MEM_DESCRIPTOR *MemDescriptor = KernelInfo.MemoryMap;
+            (UINT64)MemDescriptor < (UINT64)KernelInfo.MemoryMap + KernelInfo.MemoryMapSize;
+            MemDescriptor = (EFI_MEM_DESCRIPTOR*)((UINT64)MemDescriptor + KernelInfo.DescriptorSize))
+        {
+            if(MemDescriptor->Type == EfiConventionalMemory)
+            {
+                MemDescriptor->VirtualStart = SysMemoryIterator;
+                MemDescriptor->Attribute = EFI_MEMORY_RUNTIME;
+                MemDescriptor->Type = EfiRuntimeServicesData;
+                SysMemoryIterator += MemDescriptor->NumberOfPages*0x1000;
+                continue;
+            }
+
+            MemDescriptor->VirtualStart = MemDescriptor->PhysicalStart;
+        }
+
+        KernelInfo.SysMemorySize = SysMemoryIterator - KernelInfo.pSysMemory;
+
+        Status = SetVirtualAddressMap (
+                KernelInfo.MemoryMapSize,
+                KernelInfo.DescriptorSize,
+                KernelInfo.DescriptorVersion,
+                (EFI_MEMORY_DESCRIPTOR*)KernelInfo.MemoryMap
+        );
+        if (EFI_ERROR(Status)) while(1);
+    }
+
+    /*
+     * Get the date and time, and put in kernel descriptor
+     */
+    GetTime((EFI_TIME*)&(KernelInfo.TimeDescriptor), NULL);
+
     KernelEntry(&KernelInfo);
 
     return Status;
