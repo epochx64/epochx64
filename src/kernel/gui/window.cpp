@@ -62,7 +62,5 @@ namespace GUI
         DrawRectangle(
                 Vec2<UINT64>(X-1, Y-1), Vec2<UINT64>(X+1 + Width, Y+1 + Height), COLOR_WHITE
                 );
-
-        cout << "Test window\n";
     }
 }

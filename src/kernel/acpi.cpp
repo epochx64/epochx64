@@ -27,13 +27,14 @@ namespace ACPI
             using namespace kernel;
             using namespace math;
 
-            double divisions = 2400.0;
+            double divisions = 120.0;
             double dtheta = 2 * PI / divisions;
 
             //  Draw a fat circle
             for (double theta = 0.0; theta < 2*PI; theta += dtheta) {
                 for (int j = 0; j < radius; j++)
-                    PutPixel(x + j*cos(theta), y + j*sin(theta), &(KernelDescriptor->GOPInfo), c);
+                    PutPixel(RoundDouble<UINT64>(x + j*cos(theta)),RoundDouble<UINT64>(y + j*sin(theta)),
+                                            &(KernelDescriptor->GOPInfo), c);
             }
 
             c.u8_R += 10;
@@ -50,7 +51,6 @@ namespace ACPI
         auto pXSDT = RSDPDescriptor->XSDTAddress;
 
         KernelDescriptor->pXSDT = (UINT64)pXSDT;
-        if(pXSDT != 0) kout << "XSDT Address: 0x" << HEX << (UINT64)pXSDT << "\n";
 
         InitAPIC();
     }
@@ -114,8 +114,6 @@ namespace ACPI
                  APICTimerReg = (APICTimerReg | 0x00020000 | 48) & (~0x00050000);
             SetLAPICRegister(KernelDescriptor->APICBase, 0x320, APICTimerReg);
 
-            kout << "APICTimerReg 0x" << HEX << APICTimerReg << "\n";
-
             //  Set Initial Count Register
             KernelDescriptor->APICInitCount = 0x0010000;
             SetLAPICRegister(KernelDescriptor->APICBase, 0x380, KernelDescriptor->APICInitCount);
@@ -129,7 +127,6 @@ namespace ACPI
                     (EXTENDED_SYSTEM_DESCRIPTOR_TABLE *)KernelDescriptor->pXSDT,
                     "APIC"
                     );
-            kout << "MADT Address: 0x" << HEX << (UINT64)pMADT << "\n";
 
             /*
              * Parse the MADT to find all APICs
@@ -144,11 +141,7 @@ namespace ACPI
                 auto ID    = *(Iterator + 3);
                 auto Flags = *(Iterator + 4);
 
-                if( (Type == MADT_LAPIC) && (Flags & 0b00000011) )
-                {
-                    nCores++;
-                    kout << "APIC ID: 0x" << HEX << ID << "\n";
-                }
+                if( (Type == MADT_LAPIC) && (Flags & 0b00000001) ) nCores++;
 
                 if(Size == 0) break;
                 Iterator += Size;
@@ -171,9 +164,9 @@ namespace ACPI
                         (UINT64)&gfxroutine,
                         true,
                         new TASK_ARG[3] {
-                                (TASK_ARG)(new double(55.0 + 110*i)),
-                                (TASK_ARG)(new double(250.0)),
-                                (TASK_ARG)(new int(50))
+                                (TASK_ARG)(new double(550.0 + 42.0*i)),
+                                (TASK_ARG)(new double(40.0)),
+                                (TASK_ARG)(new int(16))
                         }
                 ));
             }

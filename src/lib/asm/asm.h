@@ -36,6 +36,8 @@ namespace ASMx64
     extern "C" UINT32 CR3Value;
 
     extern "C" UINT64 APICID();
+
+    extern "C" void SetRSP(UINT64 RSP);
 }
 
 

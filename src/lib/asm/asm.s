@@ -288,6 +288,15 @@ GetCR3Value:
 
     ret
 
+    global SetRSP
+SetRSP:
+    sub rdi, 8
+    mov rax, [rsp]
+    mov [rdi], rax
+    mov rsp, rdi
+
+    ret
+
 ;   Sets up floating point math
     global EnableSSE
 EnableSSE:

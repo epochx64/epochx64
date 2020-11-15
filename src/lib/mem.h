@@ -11,9 +11,29 @@ void* operator new[] ( size_t count );
 
 namespace mem
 {
-    void set(byte *dst, byte val, uint64_t count);
-    void copy(byte *src, byte *dst, size_t count);
-    void zero(byte *dst, size_t count);
+    static void FORCE_INLINE set(byte *dst, byte val, uint64_t count)
+    {
+        for ( uint64_t i = 0; i < count; i++ )
+        {
+            dst[i] = val;
+        }
+    }
+
+    static void FORCE_INLINE copy(byte *src, byte *dst, size_t count)
+    {
+        for(size_t i = 0; i < count; i++)
+        {
+            dst[i] = src[i];
+        }
+    }
+
+    static void FORCE_INLINE zero(byte *dst, size_t count)
+    {
+        for(size_t i = 0; i < count; i++)
+        {
+            dst[i] = 0x00;
+        }
+    }
 }
 
 namespace heap

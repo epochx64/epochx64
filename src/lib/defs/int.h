@@ -8,6 +8,7 @@
 typedef uint8_t UINT8;
 typedef uint16_t UINT16;
 typedef uint32_t UINT32;
+typedef signed short INT16;
 typedef uint64_t UINT64;
 typedef UINT64 UINTN;
 
