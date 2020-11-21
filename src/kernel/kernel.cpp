@@ -44,36 +44,12 @@ void KernelMain(KERNEL_DESCRIPTOR *KernelInfo)
 
     //  Temporary
     {
-        using namespace log;
-
-        auto pKernelWindow = new GUI::Window(500, 100, 500, 1200);
-
-        for(EFI_MEM_DESCRIPTOR *MemDescriptor = KernelDescriptor->MemoryMap;
-            (UINT64)MemDescriptor < (UINT64)KernelDescriptor->MemoryMap + KernelDescriptor->MemoryMapSize;
-            MemDescriptor = (EFI_MEM_DESCRIPTOR*)((UINT64)MemDescriptor + KernelDescriptor->DescriptorSize)
-                )
-        {
-            dout    << "0x"<<HEX<<MemDescriptor->PhysicalStart
-                    << " is at 0x"<< MemDescriptor->VirtualStart
-                    << " with 0x"<<MemDescriptor->NumberOfPages << " pages "
-                    << "with type: " << MemDescriptor->Type << "\n";
-        }
-
-        double SysMemSize = (double)KernelDescriptor->SysMemorySize / 0x40000000;
-        kout << "Free SysMemory: "<<DEC<<math::RoundDouble<UINT64>(SysMemSize) << "GiB\n";
-
+        auto pKernelWindow = new GUI::Window(500, 100, 400, 900);
         pKernelWindow->Draw();
 
-        kout << "Testing SysMemory\n";
-        for(auto Byte = (byte*)KernelDescriptor->pSysMemory;
-        (UINT64)Byte < KernelDescriptor->pSysMemory + KernelDescriptor->SysMemorySize;
-        Byte = Byte + 0x200000)
-        {
-            pKernelWindow->cout << "Testing address: 0x"<<HEX<<(UINT64)Byte << "\n";
-            *Byte = 0;
-        }
-
-        kout << "Tested SysMemory\n";
+        double SysMemSize = (double)KernelDescriptor->SysMemorySize / 0x40000000;
+        log::kout << "Free SysMemory: "<<DEC<<math::RoundDouble<UINT64>(SysMemSize) << "GiB\n";
+        log::kout << "Sizeof BLOCK_GROUP: 0x"<<HEX<<sizeof(ext2::BLOCK_GROUP) << "\n";
     }
 
     /*

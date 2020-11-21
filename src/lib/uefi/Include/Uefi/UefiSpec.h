@@ -121,7 +121,7 @@ typedef struct {
   ///
   EFI_VIRTUAL_ADDRESS   VirtualStart;
   ///
-  /// NumberOfPagesNumber of 4 KiB pages in the memory region.
+  ///Number of 4 KiB pages in the memory region.
   /// NumberOfPages must not be 0, and must not be any value
   /// that would represent a memory page with a start address,
   /// either physical or virtual, above 0xfffffffffffff000.

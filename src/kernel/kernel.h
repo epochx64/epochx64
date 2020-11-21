@@ -10,6 +10,7 @@
 #include <kernel/log.h>
 #include <boot/shared_boot_defs.h>
 #include <kernel/gui/window.h>
+#include <fs/ext2.h>
 
 extern "C" void KernelMain(KERNEL_DESCRIPTOR*);
 
