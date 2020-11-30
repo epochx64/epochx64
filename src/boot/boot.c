@@ -213,6 +213,9 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             UINT64 nPages = 1 + (SectionSize / 0x1000);
             AllocatePages(AllocateAddress, EfiLoaderData, nPages, &pSectionStart);
 
+            for(UINT64 *i = (UINT64*)pSectionStart; (UINT64)i < pSectionStart + SectionSize; i++)
+                *i = 0;
+
             MemSet((void*)pSectionStart, 0x00, SectionSize);
         }
     }
