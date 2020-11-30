@@ -45,11 +45,14 @@ void KernelMain(KERNEL_DESCRIPTOR *KernelInfo)
     //  Temporary
     {
         auto pKernelWindow = new GUI::Window(500, 100, 400, 900);
+        pKernelWindow->cout << "sizeof(DIRECTORY_ENTRY) = 0x"<<HEX<<sizeof(ext2::DIRECTORY_ENTRY) << "\n";
+        pKernelWindow->cout << "Sizeof BLOCK_GROUP: 0x"<<HEX<<sizeof(ext2::BLOCK_GROUP) << "\n";
         pKernelWindow->Draw();
 
         double SysMemSize = (double)KernelDescriptor->SysMemorySize / 0x40000000;
         log::kout << "Free SysMemory: "<<DEC<<math::RoundDouble<UINT64>(SysMemSize) << "GiB\n";
-        log::kout << "Sizeof BLOCK_GROUP: 0x"<<HEX<<sizeof(ext2::BLOCK_GROUP) << "\n";
+
+        //ext2::RAMDisk RAMDisk(0x20000000)
     }
 
     /*

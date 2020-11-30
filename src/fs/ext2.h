@@ -1,10 +1,16 @@
 #ifndef _EXT2_H
 #define _EXT2_H
 
+/*
+ * A modified version of ext2 that is probably not compatible with
+ * actual ext2 for a while
+ */
+
 #include <kernel/typedef.h>
 
 namespace ext2
 {
+    #define MAX_PATH 260
     #define BLOCK_SIZE 0x1000
     #define SUPERBLOCK_SIZE 1024
 
@@ -16,6 +22,12 @@ namespace ext2
 
     #define BLOCK_BITMAP_SIZE (BLOCKS_PER_BLOCK_GROUP/8)/BLOCK_SIZE
     #define INODE_BITMAP_SIZE (INODES_PER_BLOCK_GROUP/8)/BLOCK_SIZE
+
+    //  Single/double/triple Index Block Pointer used in inodes
+    #define BLOCK_SPAN 1
+    #define SIBP_SPAN BLOCK_SIZE/4
+    #define DIBP_SPAN (BLOCK_SIZE/4)*SIBP_SPAN
+    #define TIBP_SPAN (BLOCK_SIZE/4)*DIBP_SPAN
 
     /*
      * All information about filesystem
@@ -141,6 +153,22 @@ namespace ext2
                 ];
     } __attribute__((packed)) BLOCK_GROUP;
 
+    typedef struct
+    {
+        INODE *INode;
+        UINT64 nBlocks;
+        UINT64 Size;
+        UINT8 Path[MAX_PATH];
+    } FILE;
+
+    typedef struct
+    {
+        INODE *INode;
+        UINT16 Size;
+        UINT8 Type;
+        UINT8 Name[MAX_PATH];
+    } __attribute__((packed, aligned(4))) DIRECTORY_ENTRY;
+
     class RAMDisk
     {
     public:
@@ -151,7 +179,31 @@ namespace ext2
 
         SUPERBLOCK *pSuperBlock;
 
-        UINT64 FORCE_INLINE GetBlockAddress(UINT64 Block){ return pLBA0 + BLOCK_SIZE*Block; }
+        BLOCK_GROUP *BlockGroups;
+
+        //  Block groups start at 0
+        BLOCK_GROUP *GetBlockGroup(UINT64 ID);
+
+        //  INodes start at 1
+        INODE *GetINode(UINT64 ID);
+
+        //  Blocks start at 1
+        BLOCK *GetBlock(UINT64 ID);
+
+        void AllocateBlocks(INODE* INode, UINT64 Size);
+
+        DIRECTORY_ENTRY *GetINodeDirectoryEntry(INODE *INode, UINT64 ID);
+        void SetINodeDirectoryEntry(INODE *INode, UINT64 EntryID, DIRECTORY_ENTRY *DirectoryEntry);
+
+        FILE *GetFile(UINT8 *Path);
+    private:
+        /*
+         * Finds just one free block in the filesystem and returns its ID
+         */
+        UINT64 AllocateBlock();
+
+        UINT64 GetTIBPEntry(INODE* INode, UINT64 Index);
+        void SetTIBPEntry(INODE* INode, UINT64 Index, UINT64 Value);
     };
 }
 
