@@ -6,10 +6,10 @@
 
 namespace string
 {
-    inline uint64_t strlen(char *str)
+    inline uint64_t strlen(unsigned char *str, char terminator = 0)
     {
         uint64_t return_value = 0;
-        while ( str[return_value++] );
+        while ( str[return_value++] != terminator );
         return return_value - 1;
     }
 

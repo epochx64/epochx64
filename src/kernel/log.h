@@ -13,7 +13,7 @@ namespace log
 {
     /*
      * kout << and dout << need to check whether they are
-     * printing a string (char*) or just a plain int
+     * printing a string (unsigned char*) or just a plain int
      */
     template <typename T> struct is_pointer { static const bool value = false; };
     template <typename T> struct is_pointer<T*> { static const bool value = true; };
@@ -41,8 +41,8 @@ namespace log
         {
             if(is_pointer<T>::value)
             {
-                uint64_t len = string::strlen((char*)val);
-                for(uint64_t i = 0; i < len; i++) PutChar(((char*)val)[i]);
+                uint64_t len = string::strlen((unsigned char*)val);
+                for(uint64_t i = 0; i < len; i++) PutChar(((unsigned char*)val)[i]);
 
                 return *this;
             }
@@ -110,8 +110,8 @@ namespace log
         {
             if(is_pointer<T>::value)
             {
-                uint64_t len = string::strlen((char*)val);
-                for(uint64_t i = 0; i < len; i++) PutChar(((char*)val)[i]);
+                uint64_t len = string::strlen((unsigned char*)val);
+                for(uint64_t i = 0; i < len; i++) PutChar(((unsigned char*)val)[i]);
 
                 return *this;
             }
