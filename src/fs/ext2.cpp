@@ -10,7 +10,7 @@ namespace ext2
         BlockGroups = (BLOCK_GROUP*)pSuperBlock;
 
         //  Zero out the disk
-        for(auto i = (UINT8*)pStart; (UINT64)i < pStart + Size; i++)
+        for(auto i = (UINT64*)pStart; (UINT64)i < pStart + Size; i++)
             *i = 0;
     }
 
@@ -33,14 +33,15 @@ namespace ext2
         return (BLOCK*)((UINT64)BlockGroups + (ID-1)*BLOCK_SIZE);
     }
 
-    UINT64 RAMDisk::AllocateBlock()
+    BLOCK_ID RAMDisk::AllocateBlock()
     {
         /*
          * Iterate through all the block groups
          */
+        BLOCK_ID BlockNum = 0;
         for (auto iBlockGroup = (BLOCK_GROUP*)pSuperBlock;
              (UINT64)iBlockGroup < (UINT64)pSuperBlock + pSuperBlock->s_blocks_count * BLOCK_SIZE;
-             iBlockGroup = (BLOCK_GROUP*)((UINT64)iBlockGroup + sizeof(SUPERBLOCK)))
+             iBlockGroup = (BLOCK_GROUP*)((UINT64)iBlockGroup + sizeof(BLOCK_GROUP)))
         {
             /*
              * Go through the block group's block bitmap
@@ -49,11 +50,11 @@ namespace ext2
              * 1 = occupied block
              * 0 = unoccupied block
              */
-            UINT64 BlockNum = 0;
+
             for (auto BitmapIterator = (UINT8 *) iBlockGroup->BlockBitMap;
                  BitmapIterator < (UINT8 *) iBlockGroup->BlockBitMap + BLOCKS_PER_BLOCK_GROUP / 8; BitmapIterator++)
             {
-                for (UINT8 Mask = 0b00000001, BlockOffset = 0; Mask <= 0b10000000; Mask <<= 1, BlockOffset++)
+                for (UINT8 Mask = 0b00000001, i = 0; i < 8; Mask <<= 1, i++)
                 {
                     BlockNum++;
 
@@ -63,10 +64,58 @@ namespace ext2
                     //  Set the block as occupied
                     *BitmapIterator |= Mask;
 
-                    return ((UINT64)iBlockGroup - (UINT64)pSuperBlock)/BLOCK_SIZE + BlockNum;
+                    return BlockNum;
                 }
             }
         }
+
+        return 0;
+    }
+
+    INODE_ID RAMDisk::AllocateINode()
+    {
+        /*
+         * Iterate through all the block groups
+         */
+        INODE_ID INodeNum = 0;
+
+        for(
+                auto iBlockGroup = (BLOCK_GROUP*)pSuperBlock;
+                (UINT64)iBlockGroup < (UINT64)pSuperBlock + pSuperBlock->s_blocks_count * BLOCK_SIZE;
+                iBlockGroup = (BLOCK_GROUP*)((UINT64)iBlockGroup + sizeof(SUPERBLOCK)))
+        {
+            /*
+             * Go through the block group's inode bitmap
+             *
+             * For each byte, look at the bits
+             * 1 = occupied inode
+             * 0 = unoccupied inode
+             */
+            for(
+                    auto BitmapIterator = (UINT8*)iBlockGroup->InodeBitMap;
+                    BitmapIterator < (UINT8*)iBlockGroup->InodeBitMap + INODES_PER_BLOCK_GROUP / 8;
+                    BitmapIterator++)
+            {
+                for (UINT8 Mask = 0b00000001, i = 0; i < 8; Mask <<= 1, i++)
+                {
+                    INodeNum++;
+
+                    //  If inode is occupied
+                    if(*BitmapIterator & Mask)
+                        continue;
+
+                    //  Set the inode as occupied
+                    *BitmapIterator |= Mask;
+
+                    /*
+                     * Write pointer to found block in INode
+                     */
+                    return INodeNum;
+                }
+            }
+        }
+
+        return 0;
     }
 
     UINT64 RAMDisk::GetTIBPEntry(INODE *INode, UINT64 Index)
@@ -182,7 +231,7 @@ namespace ext2
             for(auto BitmapIterator = (UINT8*)iBlockGroup->BlockBitMap;
             BitmapIterator < (UINT8*)iBlockGroup->BlockBitMap + BLOCKS_PER_BLOCK_GROUP / 8; BitmapIterator++)
             {
-                for(UINT8 Mask = 0b00000001, BlockOffset = 0; BlockOffset < 8; Mask<<=1, BlockOffset++)
+                for (UINT8 Mask = 0b00000001, i = 0; i < 8; Mask <<= 1, i++)
                 {
                     BlockNum++;
 
@@ -207,6 +256,33 @@ namespace ext2
                     if(++BlocksAllocated >= Size) return;
                 }
             }
+        }
+    }
+
+    void RAMDisk::CreateFile(FILE *File)
+    {
+        auto Path = File->Path;
+
+        /*
+         * Start off with root dir
+         */
+        INODE *INode = GetINode(2);
+
+        /*
+         * The first three INodes in a directory are occupied
+         * 0: IndexFile
+         * 1: .
+         * 2: ..
+         *
+         */
+        using namespace string;
+
+        /*
+         * TODO: Change this to use binary search
+         */
+        for(UINT16 i = 0; i < MAX_PATH; i += strlen(Path + i, '/') + 1)
+        {
+            for(UINT64 j = 0; i < INode->)
         }
     }
 

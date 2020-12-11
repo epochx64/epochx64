@@ -1,6 +1,8 @@
 #ifndef _EXT2_H
 #define _EXT2_H
 
+#include <lib/string.h>
+
 /*
  * A modified version of ext2 that is probably not compatible with
  * actual ext2 for a while
@@ -28,6 +30,9 @@ namespace ext2
     #define SIBP_SPAN BLOCK_SIZE/4
     #define DIBP_SPAN (BLOCK_SIZE/4)*SIBP_SPAN
     #define TIBP_SPAN (BLOCK_SIZE/4)*DIBP_SPAN
+
+    typedef UINT64 BLOCK_ID;
+    typedef UINT64 INODE_ID;
 
     /*
      * All information about filesystem
@@ -158,6 +163,7 @@ namespace ext2
         INODE *INode;
         UINT64 nBlocks;
         UINT64 Size;
+        UINT8 Type;
         UINT8 Path[MAX_PATH];
     } FILE;
 
@@ -192,15 +198,19 @@ namespace ext2
 
         void AllocateBlocks(INODE* INode, UINT64 Size);
 
+        INODE_ID AllocateINode();
+
         DIRECTORY_ENTRY *GetINodeDirectoryEntry(INODE *INode, UINT64 ID);
         void SetINodeDirectoryEntry(INODE *INode, UINT64 EntryID, DIRECTORY_ENTRY *DirectoryEntry);
+
+        void CreateFile(FILE *File);
 
         FILE *GetFile(UINT8 *Path);
     private:
         /*
          * Finds just one free block in the filesystem and returns its ID
          */
-        UINT64 AllocateBlock();
+        BLOCK_ID AllocateBlock();
 
         UINT64 GetTIBPEntry(INODE* INode, UINT64 Index);
         void SetTIBPEntry(INODE* INode, UINT64 Index, UINT64 Value);
