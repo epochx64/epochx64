@@ -33,6 +33,11 @@ namespace ext2
 
     typedef UINT64 BLOCK_ID;
     typedef UINT64 INODE_ID;
+    typedef UINT64 ENTRY_ID;
+
+    typedef UINT64 STATUS;
+    #define STATUS_FAIL 0
+    #define STATUS_OK 1
 
     /*
      * All information about filesystem
@@ -160,8 +165,6 @@ namespace ext2
 
     typedef struct
     {
-        INODE *INode;
-        UINT64 nBlocks;
         UINT64 Size;
         UINT8 Type;
         UINT8 Path[MAX_PATH];
@@ -169,8 +172,8 @@ namespace ext2
 
     typedef struct
     {
-        INODE *INode;
-        UINT16 Size;
+        UINT64 INodeID;
+        UINT64 Size;
         UINT8 Type;
         UINT8 Name[MAX_PATH];
     } __attribute__((packed, aligned(4))) DIRECTORY_ENTRY;
@@ -203,9 +206,8 @@ namespace ext2
         DIRECTORY_ENTRY *GetINodeDirectoryEntry(INODE *INode, UINT64 ID);
         void SetINodeDirectoryEntry(INODE *INode, UINT64 EntryID, DIRECTORY_ENTRY *DirectoryEntry);
 
-        void CreateFile(FILE *File);
-
-        FILE *GetFile(UINT8 *Path);
+        DIRECTORY_ENTRY *GetFile(UINT8 *Path);
+        STATUS CreateFile(FILE *File);
     private:
         /*
          * Finds just one free block in the filesystem and returns its ID

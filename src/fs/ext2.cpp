@@ -10,8 +10,7 @@ namespace ext2
         BlockGroups = (BLOCK_GROUP*)pSuperBlock;
 
         //  Zero out the disk
-        for(auto i = (UINT64*)pStart; (UINT64)i < pStart + Size; i++)
-            *i = 0;
+        for(auto i = (UINT64*)pStart; (UINT64)i < pStart + Size; i++) *i = 0;
     }
 
     BLOCK_GROUP *RAMDisk::GetBlockGroup(UINT64 ID)
@@ -190,19 +189,9 @@ namespace ext2
             return;
         }
 
-        UINT64 IBPIndex[3] =
-                {
-                        BlockIndex / DIBP_SPAN, //  TIBPIndex
-                        (BlockIndex % DIBP_SPAN) / SIBP_SPAN, // DIBPIndex
-                        (BlockIndex % SIBP_SPAN) / BLOCK_SPAN // SIBPIndex
-                };
+        UINT64 TIPBEntry = GetTIBPEntry(INode, EntryID);
 
-        auto IBP = INode->i_block[14];
-
-        for(auto i : IBPIndex)
-            IBP = *(UINT32*)((UINT64)GetBlock(IBP) + i*4);
-
-        ((DIRECTORY_ENTRY*)(GetBlock(IBP)))[EntryID % DirEntriesPerBlock] = *DirectoryEntry;
+        ((DIRECTORY_ENTRY*)(GetBlock(TIPBEntry)))[EntryID % DirEntriesPerBlock] = *DirectoryEntry;
     }
 
     void RAMDisk::AllocateBlocks(INODE* INode, UINT64 Size)
@@ -259,36 +248,103 @@ namespace ext2
         }
     }
 
-    void RAMDisk::CreateFile(FILE *File)
+    DIRECTORY_ENTRY *RAMDisk::GetFile(UINT8 *Path)
     {
-        auto Path = File->Path;
-
         /*
-         * Start off with root dir
-         */
-        INODE *INode = GetINode(2);
-
-        /*
-         * The first three INodes in a directory are occupied
+         * The first three directory entries in a directory are occupied
          * 0: IndexFile
          * 1: .
          * 2: ..
-         *
          */
         using namespace string;
 
         /*
-         * TODO: Change this to use binary search
+         * Start off with root dir
          */
-        for(UINT16 i = 0; i < MAX_PATH; i += strlen(Path + i, '/') + 1)
+        auto INodeIter = GetINode(2);
+        DIRECTORY_ENTRY *DirEntryIter = nullptr;
+
+        /*
+         * TODO: Change this to use binary search and index
+         *
+         * Iterate through directories in Path string
+         */
+        for(UINT16 PathIndex = 0, NameLen; PathIndex < MAX_PATH && Path[PathIndex] != 0; PathIndex += NameLen + 1)
         {
-            for(UINT64 j = 0; i < INode->)
+            if(Path[PathIndex] == '/') PathIndex++;
+
+            NameLen = strlen(&Path[PathIndex], '/', MAX_PATH - PathIndex);
+
+            for(ENTRY_ID DirEntryID = 0; ; DirEntryID++)
+            {
+                DirEntryIter = GetINodeDirectoryEntry(INodeIter, DirEntryID);
+
+                if(strlen(DirEntryIter->Name) == 0) return nullptr;
+                if(strncmp(&Path[PathIndex], DirEntryIter->Name, NameLen))
+                {
+                    INodeIter = GetINode(DirEntryIter->INodeID);
+                    break;
+                }
+            }
         }
+
+        return DirEntryIter;;
     }
 
-    FILE *RAMDisk::GetFile(UINT8 *Path)
+    STATUS RAMDisk::CreateFile(FILE *File)
     {
-        INODE *RootDir = GetINode(2);
+        /*
+         * The first three directory entries in a directory are occupied
+         * 0: IndexFile
+         * 1: .
+         * 2: ..
+         */
+        using namespace string;
 
+        auto Path = File->Path;
+        if(GetFile(File->Path) != nullptr) return STATUS_FAIL;
+
+        /*
+         * Start off with root dir
+         */
+        auto INodeIter = GetINode(2);
+        DIRECTORY_ENTRY *DirEntryIter = nullptr;
+
+        /*
+         * TODO: Change this to use binary search and index
+         *
+         * Iterate through directories in Path string
+         */
+        for(UINT16 PathIndex = 0, NameLen; PathIndex < MAX_PATH && Path[PathIndex] != 0; PathIndex += NameLen + 1)
+        {
+            if(Path[PathIndex] == '/') PathIndex++;
+
+            NameLen = strlen(&Path[PathIndex], '/', MAX_PATH - PathIndex);
+
+            for(ENTRY_ID DirEntryID = 0; ; DirEntryID++)
+            {
+                DirEntryIter = GetINodeDirectoryEntry(INodeIter, DirEntryID);
+
+                /*
+                 * Found a free directory entry
+                 */
+                if(strlen(DirEntryIter->Name) == 0)
+                {
+                    strncpy(&Path[PathIndex], DirEntryIter->Name, NameLen);
+                    DirEntryIter->Type = File->Type;
+                    DirEntryIter->INodeID = AllocateINode();
+
+                    return STATUS_OK;
+                }
+
+                if(strncmp(&Path[PathIndex], DirEntryIter->Name, NameLen))
+                {
+                    INodeIter = GetINode(DirEntryIter->INodeID);
+                    break;
+                }
+            }
+        }
+
+        return STATUS_FAIL;
     }
 }

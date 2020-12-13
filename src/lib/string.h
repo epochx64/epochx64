@@ -6,14 +6,18 @@
 
 namespace string
 {
-    inline uint64_t strlen(unsigned char *str, char terminator = 0)
+    inline uint64_t strlen(unsigned char *str, char terminator = 0, UINT64 MaxLength = -1)
     {
         uint64_t return_value = 0;
-        while ( str[return_value++] != terminator );
+
+        /*
+         * Always check the null char
+         */
+        while ( str[return_value++] != terminator && str[return_value] != 0 && return_value <= MaxLength );
         return return_value - 1;
     }
 
-    inline bool strncmp(char *str1, char *str2, UINT64 count)
+    inline bool strncmp(unsigned char *str1, unsigned char *str2, UINT64 count)
     {
         for(UINT64 i = 0; i < count; i++)
         {
@@ -23,6 +27,11 @@ namespace string
         return true;
     }
 
+    inline void strncpy(unsigned char *src, unsigned char *dst, UINT64 count)
+    {
+        for(UINT64 i = 0; i < count; i++) dst[i] = src[i];
+    }
+
     /***
      * Takes in a uint{8,16,32,64}_t and outputs
      * a char string
@@ -30,7 +39,7 @@ namespace string
      * @param val
      * @return
      */
-     //TODO:    These are broken until heap manager is fixed, or you reimplement (do the second pls)
+     //These funcs aren't used anymore
     template<class T> inline char *to_hex(T val)
     {
         uint8_t hex_size    = sizeof(val) * 2;
