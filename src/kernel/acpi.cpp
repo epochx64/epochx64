@@ -273,7 +273,7 @@ namespace ACPI
         for(UINT16 i = 0; i < nEntries; i++)
         {
             auto Header = (SDT_HEADER *)(XSDT->pSDTArray[i]);
-            if(string::strncmp((char*)Header->Signature, ID, 4)) return (UINT64)Header;
+            if(string::strncmp((UINT8*)Header->Signature, (UINT8*)ID, 4)) return (UINT64)Header;
         }
 
         return 0;

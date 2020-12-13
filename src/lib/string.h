@@ -13,8 +13,10 @@ namespace string
         /*
          * Always check the null char
          */
-        while ( str[return_value++] != terminator && str[return_value] != 0 && return_value <= MaxLength );
-        return return_value - 1;
+        while ( str[return_value] != terminator && str[return_value] != 0 && return_value <= MaxLength )
+            return_value++;
+
+        return return_value;
     }
 
     inline bool strncmp(unsigned char *str1, unsigned char *str2, UINT64 count)
