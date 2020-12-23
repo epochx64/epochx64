@@ -1,7 +1,7 @@
 #ifndef _MATH_H
 #define _MATH_H
 
-#include <defs/int.h>
+#include <lib/defs/int.h>
 
 namespace math
 {

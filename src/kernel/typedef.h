@@ -1,7 +1,7 @@
 #ifndef _TYPEDEF_H
 #define _TYPEDEF_H
 
-#include <defs/int.h>
+#include <lib/defs/int.h>
 #include <boot/boot.h>
 #include <boot/shared_boot_defs.h>
 

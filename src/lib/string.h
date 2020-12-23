@@ -1,7 +1,7 @@
 #ifndef _STRING_H
 #define _STRING_H
 
-#include <defs/int.h>
+#include <lib/defs/int.h>
 #include <lib/math/math.h>
 
 namespace string
