@@ -4,8 +4,10 @@
 #include <lib/string.h>
 
 /*
- * A modified version of ext2 that is probably not compatible with
- * actual ext2 for a while
+ * This fs is heavily influenced by ext2, but not compatible in the slightest
+ * with ext2. It's written to work as the bare minimum for the epoch kernel
+ * Because this is only supposed to be a bare minimum implementation, expect some
+ * spaghetti
  */
 
 #include <kernel/typedef.h>
@@ -38,6 +40,9 @@ namespace ext2
     typedef UINT64 STATUS;
     #define STATUS_FAIL 0
     #define STATUS_OK 1
+
+    #define  FILETYPE_DIR 1
+    #define FILETYPE_REG 0
 
     /*
      * All information about filesystem
@@ -178,11 +183,23 @@ namespace ext2
         UINT8 Name[MAX_PATH];
     } __attribute__((packed, aligned(4))) DIRECTORY_ENTRY;
 
+    STATUS GetFilenameFromPath(UINT8 Path[MAX_PATH], UINT8* Filename);
+
     class RAMDisk
     {
     public:
         RAMDisk(UINT64 pStart, UINT64 Size);
 
+        DIRECTORY_ENTRY *GetFile(UINT8 *Path);
+        STATUS CreateFile(FILE *File);
+
+        STATUS ReadFile(FILE *File, UINT8 *Buffer);
+
+        STATUS WriteFile(FILE *File, UINT8 *Buffer);
+
+        STATUS MakeDir(UINT8 Path[MAX_PATH]);
+
+    private:
         UINT64 pLBA0;
         UINT64 DiskSize;
 
@@ -190,32 +207,44 @@ namespace ext2
 
         BLOCK_GROUP *BlockGroups;
 
-        //  Block groups start at 0
+        /*
+         * Takes a block group ID and returns pointer to it in memory
+         * Block groups start at 0
+         */
         BLOCK_GROUP *GetBlockGroup(UINT64 ID);
 
-        //  INodes start at 1
+        /*
+         * Takes an INode ID and returns pointer to it in memory
+         * INodes start at 1
+         */
         INODE *GetINode(UINT64 ID);
 
-        //  Blocks start at 1
+        /*
+         * Takes a block ID and returns pointer to it in memory
+         * Blocks start at 1
+         */
         BLOCK *GetBlock(UINT64 ID);
 
+        /*
+         * Used for file allocation
+         */
         void AllocateBlocks(INODE* INode, UINT64 Size);
 
         INODE_ID AllocateINode();
-
-        DIRECTORY_ENTRY *GetINodeDirectoryEntry(INODE *INode, UINT64 ID);
-        void SetINodeDirectoryEntry(INODE *INode, UINT64 EntryID, DIRECTORY_ENTRY *DirectoryEntry);
-
-        DIRECTORY_ENTRY *GetFile(UINT8 *Path);
-        STATUS CreateFile(FILE *File);
-    private:
         /*
-         * Finds just one free block in the filesystem and returns its ID
+         * Finds a free block in the filesystem and returns its ID
          */
         BLOCK_ID AllocateBlock();
 
-        UINT64 GetTIBPEntry(INODE* INode, UINT64 Index);
-        void SetTIBPEntry(INODE* INode, UINT64 Index, UINT64 Value);
+        BLOCK_ID GetTIBPEntry(INODE* INode, UINT64 Index);
+        void SetTIBPEntry(INODE* INode, UINT64 Index, BLOCK_ID Value);
+
+        /*
+         * Uses an inode's Triply Indirect Block Pointer to locate
+         * DIRECTORY ENTRY pointer
+         */
+        DIRECTORY_ENTRY *GetINodeDirectoryEntry(INODE *INode, UINT64 ID);
+        void SetINodeDirectoryEntry(INODE *INode, UINT64 EntryID, DIRECTORY_ENTRY *DirectoryEntry);
     };
 }
 

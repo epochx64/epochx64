@@ -4,13 +4,15 @@ namespace ext2
 {
     RAMDisk::RAMDisk(UINT64 pStart, UINT64 Size)
     {
+        //  Zero out the disk
+        for(auto i = (UINT64*)pStart; (UINT64)i < pStart + Size; i++) *i = 0;
+
         DiskSize = Size;
         pLBA0 = pStart;
         pSuperBlock = (SUPERBLOCK*)(pLBA0 + 1024);
         BlockGroups = (BLOCK_GROUP*)pSuperBlock;
 
-        //  Zero out the disk
-        for(auto i = (UINT64*)pStart; (UINT64)i < pStart + Size; i++) *i = 0;
+        MakeDir((UINT8*) "/boot");
     }
 
     BLOCK_GROUP *RAMDisk::GetBlockGroup(UINT64 ID)
@@ -117,7 +119,7 @@ namespace ext2
         return 0;
     }
 
-    UINT64 RAMDisk::GetTIBPEntry(INODE *INode, UINT64 Index)
+    BLOCK_ID RAMDisk::GetTIBPEntry(INODE *INode, UINT64 Index)
     {
         UINT64 IBPIndex[3] =
                 {
@@ -138,7 +140,7 @@ namespace ext2
         return *IBP;
     }
 
-    void RAMDisk::SetTIBPEntry(INODE *INode, UINT64 Index, UINT64 Value)
+    void RAMDisk::SetTIBPEntry(INODE *INode, UINT64 Index, BLOCK_ID Value)
     {
         UINT64 IBPIndex[3] =
                 {
@@ -159,10 +161,6 @@ namespace ext2
         *IBP = Value;
     }
 
-    /*
-     * Uses an inode's Triply Indirect Block Pointer to locate
-     * DIRECTORY ENTRY pointer
-     */
     DIRECTORY_ENTRY *RAMDisk::GetINodeDirectoryEntry(INODE *INode, UINT64 EntryID)
     {
         UINT64 DirEntriesPerBlock = BLOCK_SIZE/sizeof(DIRECTORY_ENTRY);
@@ -259,6 +257,11 @@ namespace ext2
         using namespace string;
 
         /*
+         * Must be an absolute path
+         */
+        if(Path[0] != '/') return STATUS_FAIL;
+
+        /*
          * Start off with root dir
          */
         auto INodeIter = GetINode(2);
@@ -269,10 +272,8 @@ namespace ext2
          *
          * Iterate through directories in Path string
          */
-        for(UINT16 PathIndex = 0, NameLen; PathIndex < MAX_PATH && Path[PathIndex] != 0; PathIndex += NameLen + 1)
+        for(UINT16 PathIndex = 1, NameLen; PathIndex < MAX_PATH && Path[PathIndex] != 0; PathIndex += NameLen + 1)
         {
-            if(Path[PathIndex] == '/') PathIndex++;
-
             NameLen = strlen(&Path[PathIndex], '/', MAX_PATH - PathIndex);
 
             for(ENTRY_ID DirEntryID = 0; ; DirEntryID++)
@@ -293,7 +294,7 @@ namespace ext2
 
     STATUS RAMDisk::CreateFile(FILE *File)
     {
-        /*
+        /* TODO:
          * The first three directory entries in a directory are occupied
          * 0: IndexFile
          * 1: .
@@ -303,6 +304,11 @@ namespace ext2
 
         auto Path = File->Path;
         if(GetFile(File->Path) != nullptr) return STATUS_FAIL;
+
+        /*
+         * Must be an absolute path
+         */
+        if(Path[0] != '/') return STATUS_FAIL;
 
         /*
          * Start off with root dir
@@ -315,11 +321,9 @@ namespace ext2
          *
          * Iterate through directories in Path string
          */
-        for(UINT16 PathIndex = 0, NameLen; PathIndex < MAX_PATH && Path[PathIndex] != 0; PathIndex += NameLen + 1)
+        for(UINT16 PathIndex = 1, NameLen; PathIndex < MAX_PATH && Path[PathIndex] != 0; PathIndex += NameLen + 1)
         {
-            if(Path[PathIndex] == '/') PathIndex++;
-
-            NameLen = strlen(&Path[PathIndex], '/', MAX_PATH - PathIndex);
+            NameLen = strlen(&Path[PathIndex], '/' | 0, MAX_PATH - PathIndex);
 
             for(ENTRY_ID DirEntryID = 0; ; DirEntryID++)
             {
@@ -327,12 +331,24 @@ namespace ext2
 
                 /*
                  * Found a free directory entry
+                 * By the time we reach null entry, DirEntryIter will
+                 * be the name of the file at end of path
                  */
                 if(strlen(DirEntryIter->Name) == 0)
                 {
                     strncpy(&Path[PathIndex], DirEntryIter->Name, NameLen);
                     DirEntryIter->Type = File->Type;
                     DirEntryIter->INodeID = AllocateINode();
+                    DirEntryIter->Size = File->Size;
+
+                    INodeIter = GetINode(DirEntryIter->INodeID);
+
+                    if(File->Type == FILETYPE_REG)
+                    {
+                        AllocateBlocks(INodeIter, File->Size);
+                    }
+
+                    //TODO: If it's a directory, create . and .. dirs
 
                     return STATUS_OK;
                 }
@@ -346,5 +362,95 @@ namespace ext2
         }
 
         return STATUS_FAIL;
+    }
+
+    STATUS RAMDisk::ReadFile(FILE *File, UINT8 *Buffer)
+    {
+        auto FileDirEntry = GetFile(File->Path);
+        if(FileDirEntry == nullptr) return STATUS_FAIL;
+
+        auto FileINode = GetINode(FileDirEntry->INodeID);
+
+        UINT64 nBlocks = File->Size/BLOCK_SIZE + 1;
+        for(UINT64 iBlock = 0; iBlock < nBlocks; iBlock++)
+        {
+            UINT32 BlockID;
+
+            /*
+             * If the block index within the target inode is larger than
+             * 12 then use the triply indirect block pointer structure
+             */
+            if(iBlock < 12) BlockID = FileINode->i_block[iBlock];
+            else            BlockID = GetTIBPEntry(FileINode, iBlock);
+
+            /*
+             * Copy block from buffer to filesystem0
+             */
+            auto BlockIter = (UINT64*)GetBlock(BlockID);
+            for(UINT64 j = 0; j < BLOCK_SIZE; j+=8)
+                 *(UINT64*)(Buffer + iBlock+BLOCK_SIZE + j) = *(BlockIter++);
+        }
+
+        return STATUS_OK;
+    }
+
+    STATUS RAMDisk::WriteFile(FILE *File, UINT8 *Buffer)
+    {
+        auto FileDirEntry = GetFile(File->Path);
+        if(FileDirEntry == nullptr)
+        {
+            CreateFile(File);
+            FileDirEntry = GetFile(File->Path);
+        }
+
+        auto FileINode = GetINode(FileDirEntry->INodeID);
+
+        UINT64 nBlocks = File->Size/BLOCK_SIZE + 1;
+        for(UINT64 iBlock = 0; iBlock < nBlocks; iBlock++)
+        {
+            UINT32 BlockID;
+
+            /*
+             * If the block index within the target inode is larger than
+             * 12 then use the triply indirect block pointer structure
+             */
+            if(iBlock < 12) BlockID = FileINode->i_block[iBlock];
+            else            BlockID = GetTIBPEntry(FileINode, iBlock);
+
+            /*
+             * Copy block from buffer to filesystem0
+             */
+            auto BlockIter = (UINT64*)GetBlock(BlockID);
+            for(UINT64 j = 0; j < BLOCK_SIZE; j+=8)
+                *(BlockIter++) = *(UINT64*)(Buffer + iBlock+BLOCK_SIZE + j);
+        }
+
+        return STATUS_OK;
+    }
+
+    STATUS RAMDisk::MakeDir(UINT8 Path[MAX_PATH])
+    {
+        FILE dir, *Dir = &dir;
+
+        Dir->Type = FILETYPE_DIR;
+        Dir->Size = 0;
+
+        string::strncpy(Path, Dir->Path, string::strlen(Path));
+
+        CreateFile(Dir);
+
+        return STATUS_OK;
+    }
+
+    STATUS GetFilenameFromPath(UINT8 Path[MAX_PATH], UINT8* Filename)
+    {
+        using namespace string;
+
+        UINT16 Index = MAX_PATH;
+        while(Path[Index] != '/') Index--;
+
+        strncpy((UINT8*)&Path[Index], Filename, strlen((UINT8*)&Path[Index], 0, MAX_PATH));
+
+        return STATUS_OK;
     }
 }
