@@ -236,6 +236,11 @@ namespace ext2
          */
         BLOCK_ID AllocateBlock();
 
+        /*
+         * Sets a block as occupied in the corresponding bitmap
+         */
+        STATUS OccupyBlock(BLOCK_ID ID);
+
         BLOCK_ID GetTIBPEntry(INODE* INode, UINT64 Index);
         void SetTIBPEntry(INODE* INode, UINT64 Index, BLOCK_ID Value);
 

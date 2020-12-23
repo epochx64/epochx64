@@ -9,10 +9,11 @@ namespace ext2
 
         DiskSize = Size;
         pLBA0 = pStart;
-        pSuperBlock = (SUPERBLOCK*)(pLBA0 + 1024);
-        BlockGroups = (BLOCK_GROUP*)pSuperBlock;
 
-        MakeDir((UINT8*) "/boot");
+        pSuperBlock = (SUPERBLOCK*)(pLBA0 + 1024);
+        pSuperBlock->s_blocks_count = Size/BLOCK_SIZE;
+
+        BlockGroups = (BLOCK_GROUP*)pSuperBlock;
     }
 
     BLOCK_GROUP *RAMDisk::GetBlockGroup(UINT64 ID)
@@ -39,7 +40,7 @@ namespace ext2
         /*
          * Iterate through all the block groups
          */
-        BLOCK_ID BlockNum = 0;
+        BLOCK_ID BlockNum = 1;
         for (auto iBlockGroup = (BLOCK_GROUP*)pSuperBlock;
              (UINT64)iBlockGroup < (UINT64)pSuperBlock + pSuperBlock->s_blocks_count * BLOCK_SIZE;
              iBlockGroup = (BLOCK_GROUP*)((UINT64)iBlockGroup + sizeof(BLOCK_GROUP)))
@@ -71,6 +72,20 @@ namespace ext2
         }
 
         return 0;
+    }
+
+    STATUS RAMDisk::OccupyBlock(BLOCK_ID ID)
+    {
+        UINT64 BlockGroupID = (ID - 1) / BLOCKS_PER_BLOCK_GROUP;
+        auto BlockGroup = GetBlockGroup(BlockGroupID);
+
+        UINT64 BitMapIndex = (ID - 1) % BLOCKS_PER_BLOCK_GROUP;
+        UINT64 ByteIndex = BitMapIndex / 8;
+
+        //  Mark the block as occupied in the bitmap
+        *(UINT8*)((UINT64)BlockGroup->BlockBitMap + ByteIndex) = 0b00000001 << (BitMapIndex  % 8);
+
+        return STATUS_OK;
     }
 
     INODE_ID RAMDisk::AllocateINode()
@@ -167,9 +182,25 @@ namespace ext2
         UINT64 BlockIndex = EntryID/DirEntriesPerBlock;
 
         if(BlockIndex < 12)
-            return &((DIRECTORY_ENTRY*)(GetBlock(INode->i_block[BlockIndex])))[EntryID % DirEntriesPerBlock];
+        {
+            auto BlockID = INode->i_block[BlockIndex];
+
+            if(BlockID == 0)
+            {
+                BlockID = AllocateBlock();
+                INode->i_block[BlockIndex] = BlockID;
+            }
+
+            return &((DIRECTORY_ENTRY*)(GetBlock(BlockID)))[EntryID % DirEntriesPerBlock];
+        }
 
         UINT64 TIPBEntry = GetTIBPEntry(INode, EntryID);
+
+        if(TIPBEntry == 0)
+        {
+            TIPBEntry = AllocateBlock();
+            SetTIBPEntry(INode, EntryID, TIPBEntry);
+        }
 
         return &((DIRECTORY_ENTRY*)(GetBlock(TIPBEntry)))[EntryID % DirEntriesPerBlock];
     }
@@ -248,12 +279,6 @@ namespace ext2
 
     DIRECTORY_ENTRY *RAMDisk::GetFile(UINT8 *Path)
     {
-        /*
-         * The first three directory entries in a directory are occupied
-         * 0: IndexFile
-         * 1: .
-         * 2: ..
-         */
         using namespace string;
 
         /*
@@ -272,15 +297,21 @@ namespace ext2
          *
          * Iterate through directories in Path string
          */
-        for(UINT16 PathIndex = 1, NameLen; PathIndex < MAX_PATH && Path[PathIndex] != 0; PathIndex += NameLen + 1)
+        for(UINT16 PathIndex = 1, NameLen; PathIndex < MAX_PATH && Path[PathIndex] != 0; PathIndex += NameLen)
         {
+            if(Path[PathIndex] == '/') PathIndex++;
+
             NameLen = strlen(&Path[PathIndex], '/', MAX_PATH - PathIndex);
 
             for(ENTRY_ID DirEntryID = 0; ; DirEntryID++)
             {
                 DirEntryIter = GetINodeDirectoryEntry(INodeIter, DirEntryID);
 
+                /*
+                 * TODO: This is a lazy way of checking if the file can't be found
+                 */
                 if(strlen(DirEntryIter->Name) == 0) return nullptr;
+
                 if(strncmp(&Path[PathIndex], DirEntryIter->Name, NameLen))
                 {
                     INodeIter = GetINode(DirEntryIter->INodeID);
@@ -333,6 +364,7 @@ namespace ext2
                  * Found a free directory entry
                  * By the time we reach null entry, DirEntryIter will
                  * be the name of the file at end of path
+                 * TODO: This is janky and should be changed
                  */
                 if(strlen(DirEntryIter->Name) == 0)
                 {
@@ -347,8 +379,6 @@ namespace ext2
                     {
                         AllocateBlocks(INodeIter, File->Size);
                     }
-
-                    //TODO: If it's a directory, create . and .. dirs
 
                     return STATUS_OK;
                 }
