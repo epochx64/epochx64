@@ -8,6 +8,7 @@
 #include "font_rom.h"
 #include <kernel/typedef.h>
 #include <lib/math/conversion.h>
+#include <lib/math/math.h>
 
 namespace log
 {
@@ -134,6 +135,40 @@ namespace log
 
                 to_int(val, OutStringDec);
                 for(uint64_t i = 0; i < DecSize; i++) PutChar(OutStringDec[i]);
+            }
+
+            return *this;
+        }
+
+        krnlout &operator<<(double val)
+        {
+            using namespace conversion;
+
+            if(NumberBase == DOUBLE_DEC_ID)
+            {
+                if(val < 0)
+                {
+                    PutChar('-');
+                    val *= -1;
+                }
+
+                UINT64 BeforeDec = val;
+                UINT64 AfterDec = (val - (double)BeforeDec)*math::pow(10, 8);
+
+                UINT8 BeforeDecSize = math::ilog((UINT64)10, BeforeDec);
+                UINT8 AfterDecSize = math::ilog((UINT64)10, AfterDec);
+                UINT8 Leading0s = 8 - AfterDecSize;
+
+                char BeforeDecBuf[BeforeDecSize];
+                to_int(BeforeDec, BeforeDecBuf);
+
+                char AfterDecBuf[AfterDecSize];
+                to_int(AfterDec, AfterDecBuf);
+
+                for(UINT8 i = 0; i < BeforeDecSize; i++) PutChar(BeforeDecBuf[i]);
+                PutChar('.');
+                for(UINT8 i = 0; i < Leading0s; i++) PutChar('0');
+                for(UINT8 i = 0; i < AfterDecSize; i++) PutChar(AfterDecBuf[i]);
             }
 
             return *this;

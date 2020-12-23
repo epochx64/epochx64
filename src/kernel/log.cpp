@@ -44,7 +44,6 @@ namespace log
                 k_tty_lin = (k_tty_lin + 1) % (pFramebufferInfo->Height/16 - 1);
                 return;
 
-                //This is temporary
             case STEPUP_CHAR:
                 if(k_tty_lin > 0) k_tty_lin--;
                 return;
