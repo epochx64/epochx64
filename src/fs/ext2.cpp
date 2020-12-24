@@ -40,11 +40,13 @@ namespace ext2
         /*
          * Iterate through all the block groups
          */
-        BLOCK_ID BlockNum = 1;
+        BLOCK_ID BlockNum = 0;
         for (auto iBlockGroup = (BLOCK_GROUP*)pSuperBlock;
              (UINT64)iBlockGroup < (UINT64)pSuperBlock + pSuperBlock->s_blocks_count * BLOCK_SIZE;
              iBlockGroup = (BLOCK_GROUP*)((UINT64)iBlockGroup + sizeof(BLOCK_GROUP)))
         {
+            BlockNum += BLOCKS_PER_BLOCK_GROUP - DATA_BLOCKS_PER_GROUP;
+
             /*
              * Go through the block group's block bitmap
              *
@@ -54,7 +56,7 @@ namespace ext2
              */
 
             for (auto BitmapIterator = (UINT8 *) iBlockGroup->BlockBitMap;
-                 BitmapIterator < (UINT8 *) iBlockGroup->BlockBitMap + BLOCKS_PER_BLOCK_GROUP / 8; BitmapIterator++)
+                 BitmapIterator < (UINT8 *) iBlockGroup->BlockBitMap + DATA_BLOCKS_PER_GROUP / 8; BitmapIterator++)
             {
                 for (UINT8 Mask = 0b00000001, i = 0; i < 8; Mask <<= 1, i++)
                 {
@@ -91,14 +93,18 @@ namespace ext2
     INODE_ID RAMDisk::AllocateINode()
     {
         /*
+         * We start at inode ID 2 (which later gets incremented to 3 so we actually start at 3)
+         * because the root dir is inode 2
+         */
+        INODE_ID INodeNum = 2;
+
+        /*
          * Iterate through all the block groups
          */
-        INODE_ID INodeNum = 0;
-
         for(
                 auto iBlockGroup = (BLOCK_GROUP*)pSuperBlock;
                 (UINT64)iBlockGroup < (UINT64)pSuperBlock + pSuperBlock->s_blocks_count * BLOCK_SIZE;
-                iBlockGroup = (BLOCK_GROUP*)((UINT64)iBlockGroup + sizeof(SUPERBLOCK)))
+                iBlockGroup = (BLOCK_GROUP*)((UINT64)iBlockGroup + sizeof(BLOCK_GROUP)))
         {
             /*
              * Go through the block group's inode bitmap
@@ -225,20 +231,18 @@ namespace ext2
 
     void RAMDisk::AllocateBlocks(INODE* INode, UINT64 Size)
     {
-        /*
-         * 3 nested for loops gross
-         */
         UINT64 BlocksAllocated = 0;
+        UINT64 BlocksRequired = Size/BLOCK_SIZE + 1;
 
         /*
          * Iterate through all the block groups
          */
+        UINT64 BlockNum = 0;
         for (auto iBlockGroup = (BLOCK_GROUP*)pSuperBlock;
              (UINT64)iBlockGroup < (UINT64)pSuperBlock + pSuperBlock->s_blocks_count * BLOCK_SIZE;
-             iBlockGroup = (BLOCK_GROUP*)((UINT64)iBlockGroup + sizeof(SUPERBLOCK)))
+             iBlockGroup = (BLOCK_GROUP*)((UINT64)iBlockGroup + sizeof(BLOCK_GROUP)))
         {
-            UINT64 BlockNum = 0;
-
+            BlockNum += BLOCKS_PER_BLOCK_GROUP - DATA_BLOCKS_PER_GROUP;
             /*
              * Go through the block group's block bitmap
              *
@@ -246,8 +250,8 @@ namespace ext2
              * 1 = occupied block
              * 0 = unoccupied block
              */
-            for(auto BitmapIterator = (UINT8*)iBlockGroup->BlockBitMap;
-            BitmapIterator < (UINT8*)iBlockGroup->BlockBitMap + BLOCKS_PER_BLOCK_GROUP / 8; BitmapIterator++)
+            for (auto BitmapIterator = (UINT8 *) iBlockGroup->BlockBitMap;
+                 BitmapIterator < (UINT8 *) iBlockGroup->BlockBitMap + DATA_BLOCKS_PER_GROUP / 8; BitmapIterator++)
             {
                 for (UINT8 Mask = 0b00000001, i = 0; i < 8; Mask <<= 1, i++)
                 {
@@ -263,7 +267,7 @@ namespace ext2
                     /*
                      * Write pointer to found block in INode
                      */
-                    auto BlockID = ((UINT64)iBlockGroup - (UINT64)pSuperBlock)/BLOCK_SIZE + BlockNum;
+                    auto BlockID = BlockNum;
                     if(BlocksAllocated < 12)
                     {
                         INode->i_block[BlocksAllocated] = BlockID;
@@ -271,7 +275,7 @@ namespace ext2
                         SetTIBPEntry(INode, BlocksAllocated - 12, BlockID);
                     }
 
-                    if(++BlocksAllocated >= Size) return;
+                    if(++BlocksAllocated >= BlocksRequired) return;
                 }
             }
         }
@@ -370,8 +374,8 @@ namespace ext2
                 {
                     strncpy(&Path[PathIndex], DirEntryIter->Name, NameLen);
                     DirEntryIter->Type = File->Type;
-                    DirEntryIter->INodeID = AllocateINode();
                     DirEntryIter->Size = File->Size;
+                    DirEntryIter->INodeID = AllocateINode();
 
                     INodeIter = GetINode(DirEntryIter->INodeID);
 
@@ -410,15 +414,28 @@ namespace ext2
              * If the block index within the target inode is larger than
              * 12 then use the triply indirect block pointer structure
              */
-            if(iBlock < 12) BlockID = FileINode->i_block[iBlock];
-            else            BlockID = GetTIBPEntry(FileINode, iBlock);
+            if(iBlock < 12)
+            {
+                BlockID = FileINode->i_block[iBlock];
+            }
+            else {
+                BlockID = GetTIBPEntry(FileINode, iBlock - 12);
+            }
+
+            if(BlockID == 0)
+            {
+                auto NewBlock = AllocateBlock();
+
+                if(iBlock < 12) FileINode->i_block[iBlock] =  NewBlock;
+                else SetTIBPEntry(FileINode, iBlock, NewBlock);
+            }
 
             /*
-             * Copy block from buffer to filesystem0
+             * Copy block from buffer to filesystem
              */
             auto BlockIter = (UINT64*)GetBlock(BlockID);
-            for(UINT64 j = 0; j < BLOCK_SIZE; j+=8)
-                 *(UINT64*)(Buffer + iBlock+BLOCK_SIZE + j) = *(BlockIter++);
+            for(UINT64 j = 0; j < BLOCK_SIZE && j + iBlock*BLOCK_SIZE < File->Size; j+=8)
+                 *(UINT64*)(Buffer + iBlock*BLOCK_SIZE + j) = *(BlockIter++);
         }
 
         return STATUS_OK;
@@ -426,6 +443,8 @@ namespace ext2
 
     STATUS RAMDisk::WriteFile(FILE *File, UINT8 *Buffer)
     {
+        File->Type = FILETYPE_REG;
+
         auto FileDirEntry = GetFile(File->Path);
         if(FileDirEntry == nullptr)
         {
@@ -444,15 +463,28 @@ namespace ext2
              * If the block index within the target inode is larger than
              * 12 then use the triply indirect block pointer structure
              */
-            if(iBlock < 12) BlockID = FileINode->i_block[iBlock];
-            else            BlockID = GetTIBPEntry(FileINode, iBlock);
+            if(iBlock < 12)
+            {
+                BlockID = FileINode->i_block[iBlock];
+            }
+            else {
+                BlockID = GetTIBPEntry(FileINode, iBlock);
+            }
+
+            if(BlockID == 0)
+            {
+                BlockID = AllocateBlock();
+
+                if(iBlock < 12) FileINode->i_block[iBlock] =  BlockID;
+                else SetTIBPEntry(FileINode, iBlock, BlockID);
+            }
 
             /*
-             * Copy block from buffer to filesystem0
+             * Copy block from buffer to filesystem
              */
             auto BlockIter = (UINT64*)GetBlock(BlockID);
-            for(UINT64 j = 0; j < BLOCK_SIZE; j+=8)
-                *(BlockIter++) = *(UINT64*)(Buffer + iBlock+BLOCK_SIZE + j);
+            for(UINT64 j = 0; j < BLOCK_SIZE && j + iBlock*BLOCK_SIZE < File->Size; j+=8)
+                *(BlockIter++) = *(UINT64*)(Buffer + iBlock*BLOCK_SIZE + j);
         }
 
         return STATUS_OK;

@@ -8,6 +8,8 @@
  * with ext2. It's written to work as the bare minimum for the epoch kernel
  * Because this is only supposed to be a bare minimum implementation, expect some
  * spaghetti
+ *
+ * TODO: This whole lib is in need of optimization
  */
 
 #include <kernel/typedef.h>
@@ -26,6 +28,13 @@ namespace ext2
 
     #define BLOCK_BITMAP_SIZE (BLOCKS_PER_BLOCK_GROUP/8)/BLOCK_SIZE
     #define INODE_BITMAP_SIZE (INODES_PER_BLOCK_GROUP/8)/BLOCK_SIZE
+
+    #define DATA_BLOCKS_PER_GROUP\
+    (BLOCKS_PER_BLOCK_GROUP\
+    - 2\
+    - BLOCK_BITMAP_SIZE\
+    - INODE_BITMAP_SIZE\
+    - (INODES_PER_BLOCK_GROUP*sizeof(INODE)/BLOCK_SIZE))
 
     //  Single/double/triple Index Block Pointer used in inodes
     #define BLOCK_SPAN 1
@@ -159,13 +168,7 @@ namespace ext2
         BLOCK BlockBitMap[BLOCK_BITMAP_SIZE];
         BLOCK InodeBitMap[INODE_BITMAP_SIZE];
         BLOCK InodeTable[INODES_PER_BLOCK_GROUP*sizeof(INODE)/BLOCK_SIZE];
-        BLOCK DataBlocks[
-                BLOCKS_PER_BLOCK_GROUP
-                - 2
-                - BLOCK_BITMAP_SIZE
-                - INODE_BITMAP_SIZE
-                - (INODES_PER_BLOCK_GROUP*sizeof(INODE)/BLOCK_SIZE)
-                ];
+        BLOCK DataBlocks[DATA_BLOCKS_PER_GROUP];
     } __attribute__((packed)) BLOCK_GROUP;
 
     typedef struct
