@@ -1,7 +1,7 @@
 #ifndef _BOOT_H
 #define _BOOT_H
 
-#include <defs/int.h>
+#include <lib/defs/int.h>
 #include <boot/shared_boot_defs.h>
 
 /*

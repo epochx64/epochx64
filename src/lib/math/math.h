@@ -63,7 +63,7 @@ namespace math
     template<class T>
     int ceil(T val)
     {
-
+        return 0;
     }
 
     /***
@@ -75,7 +75,7 @@ namespace math
     template<class T>
     int floor(T val)
     {
-
+        return 0;
     }
 
     /*
