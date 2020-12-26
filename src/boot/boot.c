@@ -13,12 +13,12 @@ typedef __attribute__((sysv_abi)) void (*KERNEL_ENTRY)(KERNEL_DESCRIPTOR*);
 EFI_HANDLE _ImageHandle;
 
 EFI_GET_TIME GetTime;
-EFI_FREE_POOL FreePool ;
+EFI_FREE_POOL FreePool;
 EFI_TEXT_STRING OutputString;
-EFI_ALLOCATE_POOL AllocatePool ;
-EFI_GET_MEMORY_MAP GetMemoryMap ;
-EFI_ALLOCATE_PAGES AllocatePages ;
-EFI_HANDLE_PROTOCOL HandleProtocol ;
+EFI_ALLOCATE_POOL AllocatePool;
+EFI_GET_MEMORY_MAP GetMemoryMap;
+EFI_ALLOCATE_PAGES AllocatePages;
+EFI_HANDLE_PROTOCOL HandleProtocol;
 EFI_SET_VIRTUAL_ADDRESS_MAP SetVirtualAddressMap;
 
 EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *ConOut;
@@ -290,7 +290,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     if(EFI_ERROR(Status)) while(1);
 
     /*
-     * Find all free memory and map it to 0xFFFFFFFF80000000
+     * Find all free memory and map it to 0x000100000000
      */
     {
         KernelInfo.pSysMemory = 0x000100000000;
