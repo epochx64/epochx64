@@ -2,10 +2,15 @@
 
 namespace ext2
 {
-    RAMDisk::RAMDisk(UINT64 pStart, UINT64 Size)
+    RAMDisk::RAMDisk(UINT64 pStart, UINT64 Size, bool New)
     {
-        //  Zero out the disk
-        for(auto i = (UINT64*)pStart; (UINT64)i < pStart + Size; i++) *i = 0;
+        /*
+         * If we are creating a new RAM Disk, zero out the disk
+         */
+        if(New)
+        {
+            for(auto i = (UINT64*)pStart; (UINT64)i < pStart + Size; i++) *i = 0;
+        }
 
         DiskSize = Size;
         pLBA0 = pStart;
@@ -21,7 +26,7 @@ namespace ext2
         return &(BlockGroups[ID]);
     }
 
-    INODE *RAMDisk::GetINode(UINT64 ID)
+    INODE *RAMDisk::GetINode(INODE_ID ID)
     {
         UINT64 BlockGroupID = (ID - 1) / INODES_PER_BLOCK_GROUP;
         auto INodeTable = (INODE*)GetBlockGroup(BlockGroupID)->InodeTable;;
@@ -30,7 +35,7 @@ namespace ext2
         return &(INodeTable[INodeIndex]);
     }
 
-    BLOCK *RAMDisk::GetBlock(UINT64 ID)
+    BLOCK *RAMDisk::GetBlock(BLOCK_ID ID)
     {
         return (BLOCK*)((UINT64)BlockGroups + (ID-1)*BLOCK_SIZE);
     }
@@ -229,7 +234,7 @@ namespace ext2
         ((DIRECTORY_ENTRY*)(GetBlock(TIPBEntry)))[EntryID % DirEntriesPerBlock] = *DirectoryEntry;
     }
 
-    void RAMDisk::AllocateBlocks(INODE* INode, UINT64 Size)
+    void RAMDisk::AllocateBlocks(INODE *INode, UINT64 Size)
     {
         UINT64 BlocksAllocated = 0;
         UINT64 BlocksRequired = Size/BLOCK_SIZE + 1;
@@ -405,7 +410,9 @@ namespace ext2
 
         auto FileINode = GetINode(FileDirEntry->INodeID);
 
-        UINT64 nBlocks = File->Size/BLOCK_SIZE + 1;
+        File->Size = FileINode->i_size;
+        UINT64 nBlocks = FileINode->i_size/BLOCK_SIZE + 1;
+
         for(UINT64 iBlock = 0; iBlock < nBlocks; iBlock++)
         {
             UINT32 BlockID;
@@ -434,7 +441,7 @@ namespace ext2
              * Copy block from buffer to filesystem
              */
             auto BlockIter = (UINT64*)GetBlock(BlockID);
-            for(UINT64 j = 0; j < BLOCK_SIZE && j + iBlock*BLOCK_SIZE < File->Size; j+=8)
+            for(UINT64 j = 0; j < BLOCK_SIZE && j + iBlock*BLOCK_SIZE < FileINode->i_size; j+=8)
                  *(UINT64*)(Buffer + iBlock*BLOCK_SIZE + j) = *(BlockIter++);
         }
 
@@ -453,6 +460,8 @@ namespace ext2
         }
 
         auto FileINode = GetINode(FileDirEntry->INodeID);
+
+        FileINode->i_size = File->Size;
 
         UINT64 nBlocks = File->Size/BLOCK_SIZE + 1;
         for(UINT64 iBlock = 0; iBlock < nBlocks; iBlock++)
@@ -483,7 +492,7 @@ namespace ext2
              * Copy block from buffer to filesystem
              */
             auto BlockIter = (UINT64*)GetBlock(BlockID);
-            for(UINT64 j = 0; j < BLOCK_SIZE && j + iBlock*BLOCK_SIZE < File->Size; j+=8)
+            for(UINT64 j = 0; j < BLOCK_SIZE && j + iBlock*BLOCK_SIZE < FileINode->i_size; j+=8)
                 *(BlockIter++) = *(UINT64*)(Buffer + iBlock*BLOCK_SIZE + j);
         }
 
@@ -504,7 +513,15 @@ namespace ext2
         return STATUS_OK;
     }
 
-    STATUS GetFilenameFromPath(UINT8 Path[MAX_PATH], UINT8* Filename)
+    UINT64 RAMDisk::GetFileSize(UINT8 Path[MAX_PATH])
+    {
+        auto FileDirEntry = GetFile(Path);
+        auto FileINode = GetINode(FileDirEntry->INodeID);
+
+        return FileINode->i_size;
+    }
+
+    STATUS GetFilenameFromPath(UINT8 Path[MAX_PATH], UINT8 *Filename)
     {
         using namespace string;
 

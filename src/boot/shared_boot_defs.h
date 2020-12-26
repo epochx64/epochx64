@@ -71,6 +71,8 @@ typedef struct
     EFI_MEM_DESCRIPTOR  *MemoryMap;
     EFI_TIME_DESCRIPTOR TimeDescriptor;
 
+    UINT64 pRAMDisk;
+
     FRAMEBUFFER_INFO GOPInfo;
     FRAMEBUFFER_INFO KernelLog;
 

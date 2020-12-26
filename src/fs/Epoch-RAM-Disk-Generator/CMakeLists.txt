@@ -5,4 +5,4 @@ set(CMAKE_CXX_STANDARD 14)
 
 add_executable(Epoch_RAM_Disk_Generator main.cpp ../ext2.cpp)
 
-target_include_directories(Epoch_RAM_Disk_Generator PUBLIC ../../../src ../../ ../../lib)
+target_include_directories(Epoch_RAM_Disk_Generator PUBLIC ../../../src)

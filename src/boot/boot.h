@@ -9,5 +9,6 @@
  */
 
 #define FRAMEBUFFER_BYTES_PER_PIXEL 4
+#define INITRD_SIZE_BYTES 0x1000000
 
 #endif

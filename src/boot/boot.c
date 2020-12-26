@@ -10,6 +10,19 @@
 
 typedef __attribute__((sysv_abi)) void (*KERNEL_ENTRY)(KERNEL_DESCRIPTOR*);
 
+EFI_HANDLE _ImageHandle;
+
+EFI_GET_TIME GetTime;
+EFI_FREE_POOL FreePool ;
+EFI_TEXT_STRING OutputString;
+EFI_ALLOCATE_POOL AllocatePool ;
+EFI_GET_MEMORY_MAP GetMemoryMap ;
+EFI_ALLOCATE_PAGES AllocatePages ;
+EFI_HANDLE_PROTOCOL HandleProtocol ;
+EFI_SET_VIRTUAL_ADDRESS_MAP SetVirtualAddressMap;
+
+EFI_SIMPLE_TEXT_OUTPUT_PROTOCOL *ConOut;
+
 UINT64 StrLen(char *str)
 {
     UINT64 result = 0;
@@ -44,21 +57,66 @@ int GuidCmp(EFI_GUID GuidA, EFI_GUID GuidB, UINT64 len)
     return 1;
 }
 
+UINT8 *ReadFile(UINT16* Path)
+{
+    EFI_STATUS Status;
+
+    EFI_LOADED_IMAGE_PROTOCOL *LoadedImage;
+    EFI_GUID EFILoadedImageProtocolGUID = EFI_LOADED_IMAGE_PROTOCOL_GUID;
+    HandleProtocol(_ImageHandle, &EFILoadedImageProtocolGUID, (void**)&LoadedImage);
+
+    EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *Filesystem;
+    EFI_GUID EFISimpleFilesystemProtocolGUID = EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
+    HandleProtocol(LoadedImage->DeviceHandle, &EFISimpleFilesystemProtocolGUID, (void**)&Filesystem);
+
+    EFI_FILE_PROTOCOL *EFIRoot;
+    Filesystem->OpenVolume(Filesystem, &EFIRoot);
+
+    EFI_FILE_PROTOCOL *EFIFile;
+    Status = EFIRoot->Open(EFIRoot, &EFIFile, Path, EFI_FILE_MODE_READ, EFI_FILE_READ_ONLY);
+    if (EFI_ERROR(Status))
+    {
+        OutputString(ConOut, L"Could not locate an EFI file\n\r");
+        return 0;
+    }
+
+    //  GetInfo with NULL buffer sets FileInfoSize to expected size of EFI_FILE_INFO struct
+    EFI_GUID EFIFileInfoGUID = EFI_FILE_INFO_ID;
+    UINTN FileInfoSize = 0;
+    EFIFile->GetInfo(EFIFile, &EFIFileInfoGUID, &FileInfoSize, NULL);
+
+    //  This time, GetInfo will actually fetch the file's info
+    EFI_FILE_INFO *FileInfo;
+    UINT8 *FileBuf = 0;
+
+    AllocatePool(EfiLoaderData, FileInfoSize, (void**)&FileInfo);
+    EFIFile->GetInfo(EFIFile, &EFIFileInfoGUID, &FileInfoSize, (void*)FileInfo);
+
+    AllocatePool(EfiLoaderData, FileInfo->FileSize, (void**)&FileBuf);
+    EFIFile->Read(EFIFile, &(FileInfo->FileSize), (void*)FileBuf);
+
+    return FileBuf;
+}
+
 EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
     EFI_STATUS Status;
     KERNEL_DESCRIPTOR KernelInfo;
 
-    EFI_GET_TIME GetTime = SystemTable->RuntimeServices->GetTime;
-    EFI_FREE_POOL FreePool = SystemTable->BootServices->FreePool;
-    EFI_TEXT_STRING OutputString =  SystemTable->ConOut->OutputString;
-    EFI_ALLOCATE_POOL AllocatePool = SystemTable->BootServices->AllocatePool;
-    EFI_GET_MEMORY_MAP GetMemoryMap = SystemTable->BootServices->GetMemoryMap;
-    EFI_ALLOCATE_PAGES AllocatePages = SystemTable->BootServices->AllocatePages;
-    EFI_HANDLE_PROTOCOL HandleProtocol = SystemTable->BootServices->HandleProtocol;
-    EFI_SET_VIRTUAL_ADDRESS_MAP SetVirtualAddressMap = SystemTable->RuntimeServices->SetVirtualAddressMap;
+    _ImageHandle = ImageHandle;
 
-    OutputString(SystemTable->ConOut, L"In UEFI land\n\r");
+    GetTime = SystemTable->RuntimeServices->GetTime;
+    FreePool = SystemTable->BootServices->FreePool;
+    OutputString =  SystemTable->ConOut->OutputString;
+    AllocatePool = SystemTable->BootServices->AllocatePool;
+    GetMemoryMap = SystemTable->BootServices->GetMemoryMap;
+    AllocatePages = SystemTable->BootServices->AllocatePages;
+    HandleProtocol = SystemTable->BootServices->HandleProtocol;
+    SetVirtualAddressMap = SystemTable->RuntimeServices->SetVirtualAddressMap;
+
+    ConOut = SystemTable->ConOut;
+
+    OutputString(ConOut, L"In UEFI land\n\r");
 
     /*  Get framebuffer info and set video mode */
     FRAMEBUFFER_INFO FramebufferInfo;
@@ -127,43 +185,11 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     }
 
     /*
-     * Get a handle to the kernel bin and load the
-     * whole thing into a buffer
+     * Load kernel buffer into RAM
+     * Load initrd into RAM
      */
-    UINT8 *KernelBuffer;
-    {
-        EFI_LOADED_IMAGE_PROTOCOL *LoadedImage;
-        EFI_GUID EFILoadedImageProtocolGUID = EFI_LOADED_IMAGE_PROTOCOL_GUID;
-        HandleProtocol(ImageHandle, &EFILoadedImageProtocolGUID, (void**)&LoadedImage);
-
-        EFI_SIMPLE_FILE_SYSTEM_PROTOCOL *Filesystem;
-        EFI_GUID EFISimpleFilesystemProtocolGUID = EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID;
-        HandleProtocol(LoadedImage->DeviceHandle, &EFISimpleFilesystemProtocolGUID, (void**)&Filesystem);
-
-        EFI_FILE_PROTOCOL *EFIRoot;
-        Filesystem->OpenVolume(Filesystem, &EFIRoot);
-
-        EFI_FILE_PROTOCOL *KernelBin;
-        Status = EFIRoot->Open(EFIRoot, &KernelBin, L"\\EFI\\epochx64.bin", EFI_FILE_MODE_READ, EFI_FILE_READ_ONLY);
-        if (EFI_ERROR(Status))
-        {
-            OutputString(SystemTable->ConOut, L"Could not locate kernel ELF: \\EFI\\epochx64.bin\n\r");
-            return Status;
-        }
-
-        //  GetInfo with NULL buffer sets FileInfoSize to expected size of EFI_FILE_INFO struct
-        EFI_GUID EFIFileInfoGUID = EFI_FILE_INFO_ID;
-        UINTN FileInfoSize = 0;
-        KernelBin->GetInfo(KernelBin, &EFIFileInfoGUID, &FileInfoSize, NULL);
-
-        //  This time, GetInfo will actually fetch the file's info
-        EFI_FILE_INFO *FileInfo;
-        AllocatePool(EfiLoaderData, FileInfoSize, (void**)&FileInfo);
-        KernelBin->GetInfo(KernelBin, &EFIFileInfoGUID, &FileInfoSize, (void*)FileInfo);
-
-        AllocatePool(EfiLoaderData, FileInfo->FileSize, (void**)&KernelBuffer);
-        KernelBin->Read(KernelBin, &(FileInfo->FileSize), (void*)KernelBuffer);
-    }
+    UINT8 *KernelBuffer = ReadFile(L"\\EFI\\epochx64.elf");
+    KernelInfo.pRAMDisk = (UINT64)ReadFile(L"\\EFI\\initrd.ext2");
 
     /*
      * Next we parse the ELF header from the buffer,
