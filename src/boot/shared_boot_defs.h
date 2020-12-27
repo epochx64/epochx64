@@ -4,6 +4,9 @@
 typedef UINT64 EFI_PHYSICAL_ADDRESS;
 typedef UINT64 EFI_VIRTUAL_ADDRESS;
 
+#define FRAMEBUFFER_BYTES_PER_PIXEL 4
+#define INITRD_SIZE_BYTES 0x10000000
+
 typedef struct {
     ///
     /// Type of the memory region.
