@@ -10,6 +10,7 @@
  * spaghetti
  *
  * TODO: This whole lib is in need of optimization
+ * TODO: Implement locking (multicore)
  */
 
 #include <kernel/typedef.h>
@@ -38,9 +39,9 @@ namespace ext2
 
     //  Single/double/triple Index Block Pointer used in inodes
     #define BLOCK_SPAN 1
-    #define SIBP_SPAN BLOCK_SIZE/4
-    #define DIBP_SPAN (BLOCK_SIZE/4)*SIBP_SPAN
-    #define TIBP_SPAN (BLOCK_SIZE/4)*DIBP_SPAN
+    #define SIBP_SPAN (BLOCK_SIZE/4)
+    #define DIBP_SPAN ((BLOCK_SIZE/4)*SIBP_SPAN)
+    #define TIBP_SPAN ((BLOCK_SIZE/4)*DIBP_SPAN)
 
     typedef UINT64 BLOCK_ID;
     typedef UINT64 INODE_ID;
@@ -50,7 +51,7 @@ namespace ext2
     #define STATUS_FAIL 0
     #define STATUS_OK 1
 
-    #define  FILETYPE_DIR 1
+    #define FILETYPE_DIR 1
     #define FILETYPE_REG 0
 
     /*
@@ -191,7 +192,7 @@ namespace ext2
     class RAMDisk
     {
     public:
-        RAMDisk(UINT64 pStart, UINT64 Size);
+        RAMDisk(UINT64 pStart, UINT64 Size, bool New = true);
 
         DIRECTORY_ENTRY *GetFile(UINT8 *Path);
         STATUS CreateFile(FILE *File);
@@ -201,6 +202,8 @@ namespace ext2
         STATUS WriteFile(FILE *File, UINT8 *Buffer);
 
         STATUS MakeDir(UINT8 Path[MAX_PATH]);
+
+        UINT64 GetFileSize(UINT8 Path[MAX_PATH]);
 
     private:
         UINT64 pLBA0;
@@ -220,13 +223,13 @@ namespace ext2
          * Takes an INode ID and returns pointer to it in memory
          * INodes start at 1
          */
-        INODE *GetINode(UINT64 ID);
+        INODE *GetINode(INODE_ID ID);
 
         /*
          * Takes a block ID and returns pointer to it in memory
          * Blocks start at 1
          */
-        BLOCK *GetBlock(UINT64 ID);
+        BLOCK *GetBlock(BLOCK_ID ID);
 
         /*
          * Used for file allocation

@@ -431,10 +431,10 @@ namespace ext2
 
             if(BlockID == 0)
             {
-                auto NewBlock = AllocateBlock();
+                BlockID = AllocateBlock();
 
-                if(iBlock < 12) FileINode->i_block[iBlock] =  NewBlock;
-                else SetTIBPEntry(FileINode, iBlock, NewBlock);
+                if(iBlock < 12) FileINode->i_block[iBlock] =  BlockID;
+                else SetTIBPEntry(FileINode, iBlock - 12, BlockID);
             }
 
             /*
@@ -477,7 +477,7 @@ namespace ext2
                 BlockID = FileINode->i_block[iBlock];
             }
             else {
-                BlockID = GetTIBPEntry(FileINode, iBlock);
+                BlockID = GetTIBPEntry(FileINode, iBlock - 12);
             }
 
             if(BlockID == 0)
@@ -485,7 +485,7 @@ namespace ext2
                 BlockID = AllocateBlock();
 
                 if(iBlock < 12) FileINode->i_block[iBlock] =  BlockID;
-                else SetTIBPEntry(FileINode, iBlock, BlockID);
+                else SetTIBPEntry(FileINode, iBlock - 12, BlockID);
             }
 
             /*
