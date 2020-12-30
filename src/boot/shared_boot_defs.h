@@ -5,7 +5,7 @@ typedef UINT64 EFI_PHYSICAL_ADDRESS;
 typedef UINT64 EFI_VIRTUAL_ADDRESS;
 
 #define FRAMEBUFFER_BYTES_PER_PIXEL 4
-#define INITRD_SIZE_BYTES 0x10000000
+#define INITRD_SIZE_BYTES 0x800000
 
 typedef struct {
     ///
@@ -81,6 +81,9 @@ typedef struct
 
     UINT64 pSysMemory;
     UINT64 SysMemorySize;
+
+    UINT64 pSysMemoryBitMap;
+    UINT64 SysMemoryBitMapSize;
 
     UINT64 pRSDP;
     UINT64 pXSDT;
