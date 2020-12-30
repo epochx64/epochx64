@@ -21,6 +21,11 @@ void KernelMain(KERNEL_DESCRIPTOR *KernelInfo)
         EFI_TIME_DESCRIPTOR *Time = &KernelDescriptor->TimeDescriptor;
         log::kout <<DEC<< Time->Year <<"-"<< Time->Month <<"-"<< Time->Day
                   << " | " << Time->Hour << ":" << Time->Minute << ":" << Time->Second << "\n";
+
+        /*
+         * Set the blocks which store the sysmemory bitmap as occupied
+         */
+        SysMemBitMapSet(0, KernelDescriptor->SysMemoryBitMapSize/BLOCK_SIZE + 1);
     }
 
     /*
@@ -48,27 +53,27 @@ void KernelMain(KERNEL_DESCRIPTOR *KernelInfo)
     {
         using namespace log;
 
+        kout << "Test SysMalloc: 0x" << HEX << (UINT64)SysMalloc(0x4200) << "\n";
+
         double SysMemSize = (double)KernelDescriptor->SysMemorySize / 0x40000000;
         kout << "Free SysMemory: "<<DOUBLE_DEC << SysMemSize << "GiB\n";
 
-        double Number = -124.069420;
-        UINT64 EncodedDouble = *(UINT64*)&Number;
-        UINT8 Sign = EncodedDouble & 0x8000000000000000;
-        kout << "EncodedDouble 0x" << HEX << EncodedDouble << "\n";
-
         ext2::RAMDisk RAMDisk(KernelDescriptor->pRAMDisk, INITRD_SIZE_BYTES, false);
+
         ext2::FILE TestFile;
-
         TestFile.Type = FILETYPE_REG;
-        string::strncpy((UINT8*)"/boot/Makefile", TestFile.Path, MAX_PATH);
 
-        RAMDisk.ReadFile(&TestFile, (UINT8*)KernelDescriptor->pSysMemory);
+        TestFile.Size = RAMDisk.GetFileSize((UINT8*)"/boot/test.elf");
+        string::strncpy((UINT8*)"/boot/test.elf", TestFile.Path, MAX_PATH);
+
+        auto TestFileBuf = SysMalloc(TestFile.Size);
+        RAMDisk.ReadFile(&TestFile, (UINT8*)TestFileBuf);
 
         auto pKernelWindow = new GUI::Window(500, 100, 400, 900);
-        pKernelWindow->cout << "sizeof(DIRECTORY_ENTRY) = 0x"<<HEX<<sizeof(ext2::DIRECTORY_ENTRY) << "\n";
-        pKernelWindow->cout << "Sizeof BLOCK_GROUP: 0x"<<HEX<<sizeof(ext2::BLOCK_GROUP) << "\n";
-        pKernelWindow->cout << "Read " << TestFile.Size << " bytes from /boot/Makefile: \n" << (UINT8*)KernelDescriptor->pSysMemory << "\n";
+        pKernelWindow->cout << "Read " <<DEC<< TestFile.Size << " bytes from /boot/test.elf: \n" << (UINT8*)TestFileBuf << "\n";
         pKernelWindow->Draw();
+
+        elf::LoadELF64((Elf64_Ehdr*)TestFileBuf);
     }
 
     /*

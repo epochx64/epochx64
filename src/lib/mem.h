@@ -9,6 +9,9 @@ typedef uint8_t byte;
 void* operator new   ( size_t count );
 void* operator new[] ( size_t count );
 
+void SysMemBitMapSet(UINT64 BlockID, UINT64 nBlocks = 1);
+void *SysMalloc(UINT64 Size);
+
 namespace mem
 {
     static void FORCE_INLINE set(byte *dst, byte val, uint64_t count)

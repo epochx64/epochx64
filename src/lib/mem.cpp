@@ -81,3 +81,63 @@ namespace mem
 {
 
 }
+
+using namespace kernel;
+
+void SysMemBitMapSet(UINT64 BlockID, UINT64 nBlocks)
+{
+    UINT64 SetBlocks = 0;
+
+    for(auto BitMapIter = (UINT8*)(KernelDescriptor->pSysMemoryBitMap + (BlockID/8));
+        (UINT64)BitMapIter < (UINT64)(KernelDescriptor->pSysMemoryBitMap + KernelDescriptor->SysMemoryBitMapSize);
+        BitMapIter++)
+    {
+        for (UINT8 Mask = 1, i = 0; i < 8; Mask <<= 1, i++)
+        {
+            if(SetBlocks == 0)
+            {
+                Mask <<= (BlockID % 8);
+                i += (BlockID % 8);
+            }
+
+            *BitMapIter |= Mask;
+
+            if(++SetBlocks >= nBlocks) return;
+        }
+    }
+}
+
+void *SysMalloc(UINT64 Size)
+{
+    UINT64 nBlocks = Size/4096 + 1;
+
+    UINT64 BlockID = 0;
+    UINT64 nFoundBlocks = 0;
+
+    /*
+     * Run through the bitmap to find a contiguous chunk of memory
+     */
+    for(auto BitMapIter = (UINT8*)(KernelDescriptor->pSysMemoryBitMap);
+        (UINT64)BitMapIter < (UINT64)(KernelDescriptor->pSysMemoryBitMap + KernelDescriptor->SysMemoryBitMapSize);
+        BitMapIter++)
+    {
+        for (UINT8 Mask = 1, i = 0; i < 8; Mask <<= 1, i++)
+        {
+            BlockID++;
+
+            if(*BitMapIter & Mask)
+            {
+                nFoundBlocks = 0;
+                continue;
+            }
+
+            if(++nFoundBlocks >= nBlocks)
+            {
+                SysMemBitMapSet(BlockID - nBlocks, nBlocks);
+                return (void*)(KernelDescriptor->pSysMemory + (BlockID - nBlocks)*4096);
+            }
+        }
+    }
+
+    return nullptr;
+}
