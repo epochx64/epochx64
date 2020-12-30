@@ -1,0 +1,8 @@
+//
+// Created by Beta on 2020-12-27.
+//
+
+#ifndef EPOCHX64_RELOCATION_H
+#define EPOCHX64_RELOCATION_H
+
+#endif //EPOCHX64_RELOCATION_H
