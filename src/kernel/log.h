@@ -174,6 +174,8 @@ namespace log
             return *this;
         }
 
+        void StepForward(UINT64 Amount = 0);
+
         void SetPosition(TTY_COORD COORD);
         TTY_COORD GetPosition();
 

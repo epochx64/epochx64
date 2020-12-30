@@ -28,6 +28,11 @@ namespace log
         return COORD;
     }
 
+    void krnlout::StepForward(UINT64 Amount)
+    {
+        for(UINT64 i = 0; i < Amount; i++) PutChar(' ');
+    }
+
     void krnlout::PutChar(char c)
     {
         using namespace graphics;
@@ -43,7 +48,11 @@ namespace log
                 //  We don't want to go out of the screen
                 k_tty_lin = (k_tty_lin + 1) % (pFramebufferInfo->Height/16 - 1);
                 return;
-
+            case '\r':
+                return;
+            case '\t':
+                StepForward(4);
+                return;
             case STEPUP_CHAR:
                 if(k_tty_lin > 0) k_tty_lin--;
                 return;
