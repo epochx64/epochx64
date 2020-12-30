@@ -313,6 +313,8 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         }
 
         KernelInfo.SysMemorySize = SysMemoryIterator - KernelInfo.pSysMemory;
+        KernelInfo.pSysMemoryBitMap = KernelInfo.pSysMemory;
+        KernelInfo.SysMemoryBitMapSize = KernelInfo.SysMemorySize/0x1000/8 + 1;
 
         Status = SetVirtualAddressMap (
                 KernelInfo.MemoryMapSize,
@@ -325,6 +327,8 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     /*
      * Get the date and time, and put in kernel descriptor
+     * TODO: This won't be used forever, UEFI doesn't always give the correct time
+     *       Recommending to use NTP server (way down the line when networking is implemented) or some other method
      */
     GetTime((EFI_TIME*)&(KernelInfo.TimeDescriptor), NULL);
 
