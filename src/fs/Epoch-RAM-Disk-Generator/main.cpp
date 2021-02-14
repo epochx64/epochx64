@@ -40,55 +40,55 @@ ext2::STATUS ReadFileToRAMDisk(TCHAR *WinPath, UINT8 *RAMPath, ext2::RAMDisk *RA
     return STATUS_OK;
 }
 
+DWORD WriteBufferToFile(TCHAR *WinPath, UINT8* Buffer, UINT64 Size)
+{
+    HANDLE hFile = CreateFile(WinPath,
+                              GENERIC_WRITE,
+                              0,
+                              nullptr,
+                              CREATE_NEW,
+                              FILE_ATTRIBUTE_NORMAL,
+                              nullptr);
+
+    if(hFile == INVALID_HANDLE_VALUE) return -1;
+
+    DWORD BytesWritten;
+    WriteFile(hFile,
+              Buffer,
+              Size,
+              &BytesWritten,
+              nullptr);
+
+    return BytesWritten;
+}
+
 int main()
 {
     using namespace std;
 
     auto RAMDiskBuffer = new UINT8[INITRD_SIZE_BYTES];
     ext2::RAMDisk InitRAMDisk((UINT64)RAMDiskBuffer, INITRD_SIZE_BYTES);
-    {
-        InitRAMDisk.MakeDir((UINT8*)"/boot");
+    InitRAMDisk.MakeDir((UINT8*)"/boot");
 
-        auto File = InitRAMDisk.GetFile((UINT8*)"/boot");
-        cout << "Created directory: /" << File->Name << endl;
-    }
+    ReadFileToRAMDisk((TCHAR*)"index", (UINT8*)"/boot/index", &InitRAMDisk);
+    ReadFileToRAMDisk((TCHAR*)"test.elf", (UINT8*)"/boot/test.elf", &InitRAMDisk);
 
-    ReadFileToRAMDisk((TCHAR*)"Makefile", (UINT8*)"/boot/Makefile", &InitRAMDisk);
-
-    /*
-     * Create file /boot/testfile.t and write "TEST FILE" to it
-     * Then read it back
-     * Temporary
-     */
     ext2::FILE TestFile;
     {
         TestFile.Type = FILETYPE_REG;
-        ::string::strncpy((UINT8*)"/boot/Makefile", TestFile.Path, MAX_PATH);
+        ::string::strncpy((UINT8*)"/boot/index", TestFile.Path, MAX_PATH);
 
-        auto ReadFileBuf = new UINT8[InitRAMDisk.GetFileSize((UINT8*)"/boot/Makefile")];
+        auto RDFileSz = InitRAMDisk.GetFileSize((UINT8*)"/boot/index");
+        auto ReadFileBuf = new UINT8[RDFileSz];
         InitRAMDisk.ReadFile(&TestFile, ReadFileBuf);
 
-        cout << "ReadFile data from /boot/Makefile (" << TestFile.Size << " bytes): " << ReadFileBuf << endl;
+        WriteBufferToFile((TCHAR*)"ext2index", ReadFileBuf, TestFile.Size);
     }
 
-    HANDLE hFile = CreateFile((TCHAR*)"initrd.ext2",
-            GENERIC_WRITE,
-            0,
-            nullptr,
-            CREATE_NEW,
-            FILE_ATTRIBUTE_NORMAL,
-            nullptr);
-
-    if(hFile == INVALID_HANDLE_VALUE) return -1;
-
-    DWORD BytesWritten;
-    WriteFile(hFile,
-            RAMDiskBuffer,
-            INITRD_SIZE_BYTES,
-            &BytesWritten,
-            nullptr);
-
-    cout << "Wrote initrd.ext2 (" << BytesWritten << " bytes) to disk";
+    /*
+     * Write the init RAM Disk to a file
+     */
+    WriteBufferToFile("initrd.ext2", RAMDiskBuffer, INITRD_SIZE_BYTES);
 
     return 0;
 }
