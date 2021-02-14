@@ -11,7 +11,7 @@
 #include <boot/shared_boot_defs.h>
 #include <kernel/gui/window.h>
 #include <fs/ext2.h>
-#include <elf/relocation.h>
+#include <kernel/process.h>
 
 namespace kernel
 {
