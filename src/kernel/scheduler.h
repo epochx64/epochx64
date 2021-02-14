@@ -60,6 +60,13 @@ namespace scheduler
 
         //  Executed every APIC tick
         void Tick();
+
+        /*
+         * Use this instead of AddTask
+         * It will find the best scheduler to add the task
+         * rather than requiring you to do it yourself
+         */
+        static void ScheduleTask(Task *T);
     };
 
     extern Scheduler **Schedulers;

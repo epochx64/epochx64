@@ -7,13 +7,11 @@ namespace ACPI
 
 namespace scheduler
 {
-    //  Temporary while the kernel is still single core. Eventually
-    //  we will have an array of scheduler pointers
     Scheduler **Schedulers;
 
     //  An array of TASK_INFO pointers
     //  Size will be number of cores
-    //  Used for linkage with ASM
+    //  Used for linkage with ASM component
     TASK_INFO **TASK_INFOS;
 
     /*
@@ -56,12 +54,24 @@ namespace scheduler
         TASK_INFOS[CoreID] = ((Task*)pTasks[CurrentTask->ID])->pTaskInfo;
     }
 
+    void Scheduler::ScheduleTask(Task *T)
+    {
+        UINT64 chosenOne = 0;
+
+        for(UINT64 i = 1; i < kernel::KernelDescriptor->nCores; i++)
+        {
+            if (Schedulers[chosenOne]->nTasks > Schedulers[i]->nTasks) chosenOne = i;
+        }
+
+        Schedulers[chosenOne]->AddTask(T);
+    }
+
     Task::Task(UINT64 Entry, bool Enabled, TASK_ARG* TaskArgs)
     {
         this->Enabled = Enabled;
 
         //  TODO:   Once we have access to dynamic memory outside of the heap these calls should change
-        pTaskInfo   = (TASK_INFO *)heap::MallocAligned(sizeof(TASK_INFO), 16);
+        pTaskInfo   = (TASK_INFO*)heap::MallocAligned(sizeof(TASK_INFO), 16);
         pStack      = (UINT64)heap::MallocAligned(STACK_SIZE, 16) + STACK_SIZE;
 
         /*
