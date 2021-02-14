@@ -2,7 +2,7 @@
 
 namespace log
 {
-    dbgout::dbgout() { NumberBase = HEX_ID; }
+    //dbgout::dbgout() { NumberBase = HEX_ID; }
     krnlout::krnlout()
     {
         NumberBase = HEX_ID;
@@ -11,7 +11,7 @@ namespace log
     }
 
     krnlout kout;
-    dbgout dout;
+    //dbgout dout;
 
     void krnlout::SetPosition(TTY_COORD COORD)
     {
@@ -95,19 +95,21 @@ namespace log
         }
     }
 
-    void dbgout::PutChar(char c)
-    {
-        switch (c)
-        {
-            case HEX_CHAR:
-                NumberBase = 0;
-                return;
-
-            case DEC_CHAR:
-                NumberBase = 1;
-                return;
-        }
-
-        ASMx64::outb(COM1, c);
-    }
+//    void dbgout::PutChar(char c)
+//    {
+//        switch (c)
+//        {
+//            case HEX_CHAR:
+//                NumberBase = 0;
+//                return;
+//
+//            case DEC_CHAR:
+//                NumberBase = 1;
+//                return;
+//        }
+//
+//#ifdef KERNEL_H
+//        ASMx64::outb(COM1, c);
+//#endif
+//    }
 }
