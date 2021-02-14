@@ -2,6 +2,19 @@
 
 namespace ext2
 {
+    File::File(RAMDisk *ramDisk, UINT8 type, const char *path)
+    {
+        if(ramDisk != nullptr)
+        {
+            string::strncpy((UINT8*)path, data.Path, MAX_PATH);
+
+            data.Size = ramDisk->GetFileSize((UINT8*)path);
+            data.Type = type;
+        }
+    }
+
+    FILE *File::Data() { return &data; }
+
     RAMDisk::RAMDisk(UINT64 pStart, UINT64 Size, bool New)
     {
         /*

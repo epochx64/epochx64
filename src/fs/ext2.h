@@ -189,6 +189,22 @@ namespace ext2
 
     STATUS GetFilenameFromPath(UINT8 Path[MAX_PATH], UINT8* Filename);
 
+    class RAMDisk;
+
+    class File
+    {
+    private:
+        FILE data;
+    public:
+        File(RAMDisk *ramDisk = nullptr, UINT8 type = 0, const char *path = nullptr);
+
+        FILE *Data();
+
+        inline UINT64 Size() { return data.Size; }
+        inline UINT8 Type() { return data.Type; }
+        inline UINT8 *Path() { return data.Path; }
+    };
+
     class RAMDisk
     {
     public:
