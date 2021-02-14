@@ -3,6 +3,8 @@
 
 #include <defs/int.h>
 #include <kernel/typedef.h>
+#include <lib/math/math.h>
+#include <lib/mem.h>
 
 namespace graphics
 {

@@ -38,7 +38,7 @@ SECTIONS
 	}
 
 	.data ALIGN (4K) : AT (ADDR (.data))
-    {
-    	*(.data)
-    }
+    	{
+    		*(.data)
+    	}
 }

@@ -25,9 +25,6 @@ namespace conversion
 
             buf[hex_size - (i+1)] = c;
         }
-
-        //  Null terminate
-        buf[hex_size] = 0;
     }
 
     template <class T> void to_int(T num, char* buf)

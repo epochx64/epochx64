@@ -147,6 +147,7 @@ namespace ACPI
                 Iterator += Size;
             }
             kout << DEC << "Found " << nCores << " logical processors\n";
+            KernelDescriptor->nCores = nCores;
 
             /*
              * Setup a scheduler before the APIC timer is enabled
@@ -156,6 +157,9 @@ namespace ACPI
 
             Schedulers = (Scheduler**)(new UINT64[nCores]);
             TASK_INFOS = (TASK_INFO**)(new UINT64[nCores]);
+
+            KernelDescriptor->pSchedulers = (UINT64)Schedulers;
+            KernelDescriptor->pTaskInfos = (UINT64)TASK_INFOS;
 
             for(UINT64 i = 0; i < nCores; i++)
             {
