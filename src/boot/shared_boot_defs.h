@@ -77,7 +77,6 @@ typedef struct
     UINT64 pRAMDisk;
 
     FRAMEBUFFER_INFO GOPInfo;
-    FRAMEBUFFER_INFO KernelLog;
 
     UINT64 pSysMemory;
     UINT64 SysMemorySize;
@@ -89,6 +88,14 @@ typedef struct
     UINT64 pXSDT;
     UINT32 APICBase;
     UINT32 APICInitCount;
+
+    UINT64 pSchedulers;
+    UINT64 pTaskInfos;
+
+    UINT64 nCores;
+
+    UINT64 szKernelFunctionList;
+    UINT64 *KernelFunctionList;
 } KERNEL_DESCRIPTOR;
 
 #endif
