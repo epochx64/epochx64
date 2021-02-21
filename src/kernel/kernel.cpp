@@ -10,10 +10,11 @@ namespace kernel
      * TODO: Should convert a lot of libs to be more portable, which requires moving
      *       a lot of global variables here
      * TODO: This ENTIRE project need to turn CapitalCase to camelCase
+     * TODO: TOO MANY NAMESPACES
      */
 }
 
-void KernelMain(KERNEL_DESCRIPTOR *KernelInfo)
+void KernelMain(KERNEL_DESCRIPTOR *kernelInfo)
 {
     using namespace kernel;
 
@@ -22,7 +23,7 @@ void KernelMain(KERNEL_DESCRIPTOR *KernelInfo)
 
     KernelDescriptor = new KERNEL_DESCRIPTOR;
     {
-        mem::copy((byte*)KernelInfo, (byte*)KernelDescriptor, sizeof(KERNEL_DESCRIPTOR));
+        mem::copy((byte*)kernelInfo, (byte*)KernelDescriptor, sizeof(KERNEL_DESCRIPTOR));
         log::kout.pFramebufferInfo = &(KernelDescriptor->GOPInfo);
 
         EFI_TIME_DESCRIPTOR *Time = &KernelDescriptor->TimeDescriptor;
