@@ -31,6 +31,12 @@ void KernelMain(KERNEL_DESCRIPTOR *kernelInfo)
                   << " | " << Time->Hour << ":" << Time->Minute << ":" << Time->Second << "\n";
 
         /*
+         * Zero the sysmemory bitmap
+         */
+        for(UINT64 i = 0; i < KernelDescriptor->SysMemoryBitMapSize; i+=8)
+            *(UINT64*)(KernelDescriptor->pSysMemoryBitMap + i) = 0;
+
+        /*
          * Set the blocks which store the sysmemory bitmap as occupied
          */
         SysMemBitMapSet(0, KernelDescriptor->SysMemoryBitMapSize/BLOCK_SIZE + 1);
