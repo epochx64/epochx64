@@ -41,8 +41,8 @@ void KernelMain(KERNEL_DESCRIPTOR *kernelInfo)
          */
         SysMemBitMapSet(0, KernelDescriptor->SysMemoryBitMapSize/BLOCK_SIZE + 1);
 
-        ext2::RAMDisk RAMDisk(KernelDescriptor->pRAMDisk, INITRD_SIZE_BYTES, false);
-        kernel::RAMDisk = &RAMDisk;
+        ext2::RAMDisk ramDisk(KernelDescriptor->pRAMDisk, INITRD_SIZE_BYTES, false);
+        kernel::RAMDisk = &ramDisk;
     }
 
     /*
