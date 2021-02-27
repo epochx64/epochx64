@@ -51,17 +51,19 @@ void InitPS2()
     /*
      * Set configuration byte
      */
-    while(inb(PS2_COMMAND_PORT) & 2);
-    outb(PS2_COMMAND_PORT, 0x20);
+    {
+        while(inb(PS2_COMMAND_PORT) & 2);
+        outb(PS2_COMMAND_PORT, 0x20);
 
-    while(!(inb(PS2_COMMAND_PORT) & 1));
-    UINT8 result = (inb(0x60) & (~0b00100000)) | 0b00000010;
+        while(!(inb(PS2_COMMAND_PORT) & 1));
+        UINT8 result = (inb(0x60) & (~0b00100000)) | 0b00000010;
 
-    while(inb(PS2_COMMAND_PORT) & 2);
-    outb(PS2_COMMAND_PORT, 0x60);
+        while(inb(PS2_COMMAND_PORT) & 2);
+        outb(PS2_COMMAND_PORT, 0x60);
 
-    while(inb(PS2_COMMAND_PORT) & 2);
-    PS2Write(1, result);
+        while(inb(PS2_COMMAND_PORT) & 2);
+        PS2Write(1, result);
+    }
 
     /*
      * Perform self tests
@@ -108,32 +110,22 @@ void InitPIT()
     //  Initialization of PIC
     {
         outb(PIC1_COMMAND, ICW1_INIT | ICW1_ICW4);
-        IOWait();
         outb(PIC2_COMMAND, ICW1_INIT | ICW1_ICW4);
-        IOWait();
 
         outb(PIC1_DATA, 0x20);
-        IOWait();
         outb(PIC2_DATA, 0x28);
-        IOWait();
 
         outb(PIC1_DATA, 4);
-        IOWait();
         outb(PIC2_DATA, 2);
-        IOWait();
 
         outb(PIC1_DATA, ICW4_8086);
-        IOWait();
         outb(PIC2_DATA, ICW4_8086);
-        IOWait();
 
         /*
          * Mask all IRQs
          */
         outb(PIC1_DATA, 0b11111111);
-        IOWait();
         outb(PIC2_DATA, 0b11111111);
-        IOWait();
     }
 
     //  Reload can be whatever, might affect performance
@@ -142,15 +134,11 @@ void InitPIT()
 
     //  Send the reload value to the PIT
     outb(0x40, (UINT8)Reload);
-    IOWait();
     outb(0x40, (UINT8)(Reload >> 8));
-    IOWait();
 
     //  Unmask IRQ 0, 1, 2, 7
     outb(PIC1_DATA, 0b01111001);
-    IOWait();
 
     //  Unmask IRQ 12
     outb(PIC2_DATA, 0b11101101);
-    IOWait();
 }
