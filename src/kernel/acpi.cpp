@@ -67,8 +67,6 @@ namespace ACPI
              * Disable the 8259 PIC by masking all IRQs except for IRQ0
              * we will need to use a PIC sleep function to determine LAPIC's CPU bus frequency
              */
-            outb(0xA1, 0b11101111);
-            outb(0x21, 0b11111100);
 
             //  Grab the APIC BASE MSR value
             UINT64 MSRValue = 0;
