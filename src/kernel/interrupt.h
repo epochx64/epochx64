@@ -8,6 +8,7 @@
 #include <kernel/typedef.h>
 #include <kernel/scheduler.h>
 #include <kernel/acpi.h>
+#include <kernel/pic.h>
 
 namespace interrupt
 {
@@ -34,12 +35,6 @@ namespace interrupt
     extern "C" void FillIDT64();
 
     void SetIDTGate(UINT64 nGate, void (ISRHandler)());
-}
-
-namespace PIC
-{
-    void InitPS2();
-    void InitPIT();
 }
 
 #endif

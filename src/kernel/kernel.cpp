@@ -51,7 +51,6 @@ void KernelMain(KERNEL_DESCRIPTOR *kernelInfo)
     {
         using namespace interrupt;
         using namespace ASMx64;
-        using namespace PIC;
 
         auto pSSEINFO = heap::MallocAligned(512, 16);
         EnableSSE(pSSEINFO);

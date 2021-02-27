@@ -20,7 +20,7 @@ EFI_CFLAGS = -ffreestanding
 EFI_LINKFLAGS = -nostdlib -Wl,-dll -shared -Wl,--subsystem,10 -e efi_main  -lgcc
 EFI_INCLUDES = -Isrc/lib -Isrc -Isrc/lib/uefi/Include -Isrc/lib/uefi/Include/X64 -Isrc/lib/elf -Isrc/lib/uefi/Include/Protocol
 
-KERNEL_TARGETS = kernel log interrupt acpi graphics scheduler process gui/window
+KERNEL_TARGETS = kernel log interrupt acpi pic graphics scheduler process gui/window
 LIB_TARGETS = string mem math/math elf/relocation ../fs/ext2
 ASM_TARGETS = lib/asm/asm kernel/interrupt
 
