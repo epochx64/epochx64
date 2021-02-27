@@ -333,7 +333,12 @@ inb:
     mov dx, di  ;  Port #
     in al, dx
 
-    ret ; Returns al in C
+    ; Perform a delay
+    jmp .1
+.1:
+    jmp .2
+.2:
+    ret
 
     global outb
 outb:
@@ -348,5 +353,12 @@ outb:
 
     pop rax
     pop rdx
+
+    ; Perform a delay
+    jmp .1
+.1:
+    jmp .2
+.2:
+    ret
 
     ret
