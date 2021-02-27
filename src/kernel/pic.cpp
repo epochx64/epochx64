@@ -17,7 +17,11 @@ void PS2Write(UINT8 Port, UINT8 Value)
 {
     using namespace ASMx64;
 
-    if(Port == 2) outb(PS2_COMMAND_PORT, 0xD4);
+    if(Port == 2)
+    {
+        while(inb(0x64) & 2);
+        outb(PS2_COMMAND_PORT, 0xD4);
+    }
 
     while(inb(0x64) & 2);
     outb(0x60, Value);
@@ -28,27 +32,45 @@ void InitPS2()
     using namespace ASMx64;
     using namespace log;
 
-    //  TODO:   This is UGLY, make some helper functions
+    /*  TODO:   This is UGLY, make some helper functions
+     *  TODO:   Implement timeout when polling devices
+     */
 
-    //  Disable keyboard
+    /*
+     * Disable keyboard and mouse
+     */
     while(inb(0x64) & 2);
     outb(PS2_COMMAND_PORT, 0xAD);
 
-    //  Keyboard stuff
+    while(inb(0x64) & 2);
+    outb(PS2_COMMAND_PORT, 0xA7);
+
+    //  Flush output buffer
+    while(inb(0x64) & 1) inb(0x60);
+
+    /*
+     * Set configuration byte
+     */
+    while(inb(PS2_COMMAND_PORT) & 2);
+    outb(PS2_COMMAND_PORT, 0x20);
+
+    while(!(inb(PS2_COMMAND_PORT) & 1));
+    UINT8 result = (inb(0x60) & (~0b00100000)) | 0b00000010;
+
+    while(inb(PS2_COMMAND_PORT) & 2);
+    outb(PS2_COMMAND_PORT, 0x60);
+
+    while(inb(PS2_COMMAND_PORT) & 2);
+    PS2Write(1, result);
+
+    /*
+     * Perform self tests
+     */
     {
-        //  Flush output buffer
-        while(inb(0x64) & 1) inb(0x60);
-
-        //  Read the config
-        while(inb(0x64) & 2);
-        outb(PS2_COMMAND_PORT, (0x20|(0&0x1F)));
-        UINT8 Config = PS2Read();
-
         while(inb(0x64) & 2);
         outb(PS2_COMMAND_PORT, 0xAA);
         if(PS2Read() != 0x55) kout << "Self test FAIL\n";
 
-        //  Test the ports
         while(inb(0x64) & 2);
         outb(PS2_COMMAND_PORT, 0xAB);
         if(PS2Read()) kout << "Port 1 test FAIL\n";
@@ -56,18 +78,27 @@ void InitPS2()
         while(inb(0x64) & 2);
         outb(PS2_COMMAND_PORT, 0xA9);
         if(PS2Read()) kout << "Port 2 test FAIL\n";
-
-        //  Write the config
-        while(inb(0x64) & 2);
-        outb(PS2_COMMAND_PORT, (0x60|(0&0x1F)));
-
-        Config = (Config | 0b01000011) & (~0b00110000);
-        PS2Write(1, Config);
-
-        //  Enable Keyboard
-        while(inb(0x64) & 2);
-        outb(PS2_COMMAND_PORT, 0xAE);
     }
+
+    /*
+     * Enable PS/2 Mouse
+     */
+    {
+        //  Enable mouse
+        while(inb(PS2_COMMAND_PORT) & 2);
+        outb(PS2_COMMAND_PORT, 0xA8);
+
+        //  Configure mouse
+        PS2Write(2, 0xF6);
+        PS2Read();
+
+        PS2Write(2, 0xF4);
+        PS2Read();
+    }
+
+    //  Enable Keyboard
+    while(inb(0x64) & 2);
+    outb(PS2_COMMAND_PORT, 0xAE);
 }
 
 void InitPIT()
@@ -96,12 +127,13 @@ void InitPIT()
         outb(PIC2_DATA, ICW4_8086);
         IOWait();
 
+        /*
+         * Mask all IRQs
+         */
         outb(PIC1_DATA, 0b11111111);
         IOWait();
         outb(PIC2_DATA, 0b11111111);
         IOWait();
-
-        outb(0x43, 0b00110100);
     }
 
     //  Reload can be whatever, might affect performance
@@ -114,11 +146,11 @@ void InitPIT()
     outb(0x40, (UINT8)(Reload >> 8));
     IOWait();
 
-    //  Unmask IRQ 0, 1, 7
-    outb(PIC1_DATA, 0b01111100);
+    //  Unmask IRQ 0, 1, 2, 7
+    outb(PIC1_DATA, 0b01111001);
     IOWait();
 
     //  Unmask IRQ 12
-    outb(PIC2_DATA, 0b11101111);
+    outb(PIC2_DATA, 0b11101101);
     IOWait();
 }

@@ -8,4 +8,7 @@
 void InitPS2();
 void InitPIT();
 
+UINT8 PS2Read();
+void PS2Write(UINT8 Port, UINT8 Value);
+
 #endif

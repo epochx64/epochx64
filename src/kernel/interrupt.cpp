@@ -87,9 +87,15 @@ namespace interrupt
 
     void ISR44MouseHandler()
     {
-        kout << "Mouse ISR";
-        while(true);
-        //FYI this is PIC #2 handled so you need 2 outb to signal EOI
+        using namespace ASMx64;
+
+        while(!(inb(0x64) & 1));
+        UINT8 Scancode = inb(0x60);
+
+        kout << "Mouse ISR 0x" <<HEX<< Scancode << "\n";
+
+        outb(0xA0, 0x20);
+        outb(0x20, 0x20);   //  End of interrupt
     }
 
     void SetIDTGate(UINT64 nGate, void (*ISRHandler)())
