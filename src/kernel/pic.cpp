@@ -5,6 +5,8 @@ namespace interrupt
     extern double msPerTick;
 }
 
+UINT8 MouseID;
+
 UINT8 PS2Read()
 {
     using namespace ASMx64;
@@ -96,6 +98,12 @@ void InitPS2()
 
         PS2Write(2, 0xF4);
         PS2Read();
+
+        //  Get mouse ID
+        PS2Write(2, 0xF2);
+        PS2Read();
+        MouseID = PS2Read();
+        //kout << "Mouse ID = " <<DEC<< MouseID << "\n";
     }
 
     //  Enable Keyboard

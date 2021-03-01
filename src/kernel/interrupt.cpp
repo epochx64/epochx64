@@ -89,12 +89,34 @@ namespace interrupt
     {
         using namespace ASMx64;
 
+        static UINT8 mousePacketSize = 3 + (UINT8)((bool)MouseID);
+        static UINT8 mouseCycle{0};
+        static int x{420}, y{420};
+        static UINT8 mouseData[3];
+
+        /*
+         * Wait for PS/2 mouse data
+         */
         while(!(inb(0x64) & 1));
         UINT8 Scancode = inb(0x60);
 
-        kout << "Mouse ISR 0x" <<HEX<< Scancode << "\n";
+        /*
+         * Mouse sends 3 separate interrupts per mouse event
+         */
 
-        outb(0xA0, 0x20);
+        mouseData[mouseCycle] = Scancode;
+
+        if(mouseCycle == 2)
+        {
+            x = x + ((int)mouseData[1] - (int)(((UINT16)mouseData[0] << 4) & 0x0100));
+            y = y - ((int)mouseData[2] - (int)(((UINT16)mouseData[0] << 3) & 0x0100));
+        }
+
+        mouseCycle = (mouseCycle + 1) % mousePacketSize;
+
+        graphics::PutPixel(x, y, &(kernel::KernelDescriptor->GOPInfo), COLOR_WHITE);
+
+        outb(0xA0, 0x20);   //  EOI for the slave PIC
         outb(0x20, 0x20);   //  End of interrupt
     }
 
@@ -145,7 +167,7 @@ namespace interrupt
         SetIDTGate(32, &ISR32);     //  8259 PIC Timer IRQ0
         SetIDTGate(33, &ISR33);     //  Keyboard IRQ1
         SetIDTGate(255, &ISR255);   //  APIC Spurious
-        SetIDTGate(44, &ISR44);     //  Mouse handler
+        SetIDTGate(44, &ISR44);     //  Mouse IRQ12
         SetIDTGate(48, &ISR48);     //  APIC Timer
         SetIDTGate(49, &ISR49);     //  Test Interrupt
 

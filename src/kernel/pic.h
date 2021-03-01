@@ -5,6 +5,8 @@
 #include <lib/asm/asm.h>
 #include <kernel/log.h>
 
+extern UINT8 MouseID;
+
 void InitPS2();
 void InitPIT();
 
