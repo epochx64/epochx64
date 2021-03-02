@@ -1,3 +1,39 @@
+    %macro pushaq 0
+        push r15
+        push r14
+        push r13
+        push r12
+        push r11
+        push r10
+        push r9
+        push r8
+        push rbp
+        push rsi
+        push rdi
+        push rdx
+        push rcx
+        push rbx
+        push rax
+    %endmacro
+
+    %macro popaq 0
+        pop rax
+        pop rbx
+        pop rcx
+        pop rdx
+        pop rdi
+        pop rsi
+        pop rbp
+        pop r8
+        pop r9
+        pop r10
+        pop r11
+        pop r12
+        pop r13
+        pop r14
+        pop r15
+    %endmacro
+
     bits 64
 
     section .text
@@ -47,39 +83,11 @@ int49:
     extern ISR49Handler
     global ISR49
 ISR49:
-    push r15
-    push r14
-    push r13
-    push r12
-    push r11
-    push r10
-    push r9
-    push r8
-    push rbp
-    push rsi
-    push rdi
-    push rdx
-    push rcx
-    push rbx
-    push rax
+    pushaq
 
     call ISR49Handler
 
-    pop rax
-    pop rbx
-    pop rcx
-    pop rdx
-    pop rdi
-    pop rsi
-    pop rbp
-    pop r8
-    pop r9
-    pop r10
-    pop r11
-    pop r12
-    pop r13
-    pop r14
-    pop r15
+    popaq
 
     iretq
 
@@ -94,39 +102,10 @@ ISR32:
     ;   Timer interrupt handler uses floating point
     fxsave [FXSAVE]
 
-    push r15
-    push r14
-    push r13
-    push r12
-    push r11
-    push r10
-    push r9
-    push r8
-    push rbp
-    push rsi
-    push rdi
-    push rdx
-    push rcx
-    push rbx
-    push rax
-
+    pushaq
     call ISR32TimerHandler
+    popaq
 
-    pop rax
-    pop rbx
-    pop rcx
-    pop rdx
-    pop rdi
-    pop rsi
-    pop rbp
-    pop r8
-    pop r9
-    pop r10
-    pop r11
-    pop r12
-    pop r13
-    pop r14
-    pop r15
     fxrstor [FXSAVE]
 
     iretq
@@ -134,79 +113,17 @@ ISR32:
     extern ISR33KeyboardHandler
     global ISR33
 ISR33:
-    push r15
-    push r14
-    push r13
-    push r12
-    push r11
-    push r10
-    push r9
-    push r8
-    push rbp
-    push rsi
-    push rdi
-    push rdx
-    push rcx
-    push rbx
-    push rax
-
+    pushaq
     call ISR33KeyboardHandler
-
-    pop rax
-    pop rbx
-    pop rcx
-    pop rdx
-    pop rdi
-    pop rsi
-    pop rbp
-    pop r8
-    pop r9
-    pop r10
-    pop r11
-    pop r12
-    pop r13
-    pop r14
-    pop r15
-
+    popaq
     iretq
 
     extern ISR255SpuriousHandler
     global ISR255
 ISR255:
-    push r15
-    push r14
-    push r13
-    push r12
-    push r11
-    push r10
-    push r9
-    push r8
-    push rbp
-    push rsi
-    push rdi
-    push rdx
-    push rcx
-    push rbx
-    push rax
-
+    pushaq
     call ISR255SpuriousHandler
-
-    pop rax
-    pop rbx
-    pop rcx
-    pop rdx
-    pop rdi
-    pop rsi
-    pop rbp
-    pop r8
-    pop r9
-    pop r10
-    pop r11
-    pop r12
-    pop r13
-    pop r14
-    pop r15
-
+    popaq
     iretq
 
     ;   -------------------------------------------------------------------------
@@ -226,11 +143,11 @@ ISR48:
 
     call APICID
     mov rbx, rax
+    imul rbx, 8
 
     ; CTaskInfos is an array of pointers to TASK_INFO structs, one for every logical processor
     mov rax, [TASK_INFOS]
 
-    imul rbx, 8
     add rax, rbx
     mov rax, [rax]
 
@@ -323,40 +240,9 @@ ISR48:
     extern ISR44MouseHandler
     global ISR44
 ISR44:
-    push r15
-    push r14
-    push r13
-    push r12
-    push r11
-    push r10
-    push r9
-    push r8
-    push rbp
-    push rsi
-    push rdi
-    push rdx
-    push rcx
-    push rbx
-    push rax
-
+    pushaq
     call ISR44MouseHandler
-
-    pop rax
-    pop rbx
-    pop rcx
-    pop rdx
-    pop rdi
-    pop rsi
-    pop rbp
-    pop r8
-    pop r9
-    pop r10
-    pop r11
-    pop r12
-    pop r13
-    pop r14
-    pop r15
-
+    popaq
     iretq
 
     extern IDTR64
