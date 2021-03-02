@@ -84,11 +84,8 @@ int49:
     global ISR49
 ISR49:
     pushaq
-
     call ISR49Handler
-
     popaq
-
     iretq
 
     segment .data
