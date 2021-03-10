@@ -12,6 +12,8 @@ namespace ASMx64
     typedef UINT32    DWORD;
     typedef UINT64    QWORD;
 
+    extern "C" void nop();
+
     extern "C" BYTE inb(WORD port);
     extern "C" void outb(WORD port, BYTE val);
 

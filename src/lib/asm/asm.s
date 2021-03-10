@@ -327,6 +327,11 @@ EnableSSE:
 
     ret
 
+    global nop
+nop:
+    nop
+    ret
+
     global inb
 inb:
     xor rax, rax
