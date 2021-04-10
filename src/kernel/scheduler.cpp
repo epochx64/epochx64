@@ -26,6 +26,7 @@ namespace scheduler
         pTasks = new UINT64[64];
         CoreID = Core;
         nTasks = 1;
+        Ticks = 0;
 
         /*
          * The idle task
@@ -49,9 +50,9 @@ namespace scheduler
     void Scheduler::Tick()
     {
         //  TODO:   Not every tick should result in a task switch
-
         CurrentTask = (Task*)pTasks[(CurrentTask->ID + 1) % nTasks];
         TASK_INFOS[CoreID] = ((Task*)pTasks[CurrentTask->ID])->pTaskInfo;
+        Ticks++;
     }
 
     void Scheduler::ScheduleTask(Task *T)
@@ -68,11 +69,25 @@ namespace scheduler
 
     Task::Task(UINT64 Entry, bool Enabled, TASK_ARG* TaskArgs)
     {
+        Constructor(Entry, Enabled, TaskArgs);
+    }
+
+    Task::Task()
+    {
+
+    }
+
+    void Task::Constructor(UINT64 Entry, bool Enabled, TASK_ARG *TaskArgs)
+    {
         this->Enabled = Enabled;
 
-        //  TODO:   Once we have access to dynamic memory outside of the heap these calls should change
-        pTaskInfo   = (TASK_INFO*)heap::MallocAligned(sizeof(TASK_INFO), 16);
-        pStack      = (UINT64)heap::MallocAligned(STACK_SIZE, 16) + STACK_SIZE;
+        pTaskInfo   = (TASK_INFO*)SysMalloc(sizeof(TASK_INFO));
+        pStack      = (UINT64)SysMalloc(STACK_SIZE + 1) + STACK_SIZE;
+
+        for(UINT64 i = 0; i < (1 + sizeof(TASK_INFO)/0x1000)*0x1000; i+=8)
+            *(UINT64*)((UINT64)pTaskInfo + i) = 0;
+        //log::kout   << "PTINFO: 0x" <<HEX<< (UINT64)pTaskInfo << "\n"
+        //            << "PSTACK: 0x" <<HEX<< (UINT64)pStack << "\n";
 
         /*
          * TODO:    When scheduler prepares a task, it needs to setup a new stack frame. When the task's

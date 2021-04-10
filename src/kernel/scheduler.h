@@ -14,6 +14,9 @@ namespace scheduler
     {
     public:
         Task(UINT64 Entry, bool Enabled, TASK_ARG* TaskArgs);
+        Task();
+
+        void Constructor(UINT64 Entry, bool Enabled, TASK_ARG* TaskArgs);
 
         UINT64 pEntryPoint;
         UINT64 pStack;
@@ -37,6 +40,7 @@ namespace scheduler
         UINT64 msSleepEnd;
 
         TASK_INFO *pTaskInfo;
+        TASK_INFO TaskInfo;
     };
 
     class Scheduler
@@ -44,6 +48,7 @@ namespace scheduler
     public:
         Scheduler(bool Root, UINT64 Core);
 
+        UINT64 Ticks;
         UINT64 nTasks;
 
         //  Array of Task*
