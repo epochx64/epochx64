@@ -6,6 +6,7 @@ namespace interrupt
 }
 
 UINT8 MouseID;
+UINT8 MousePacketSize;
 
 UINT8 PS2Read()
 {
@@ -34,7 +35,7 @@ void InitPS2()
     using namespace ASMx64;
     using namespace log;
 
-    /*  TODO:   This is UGLY, make some helper functions
+    /*  TODO:   This init sequence doesn't work on some hardware (possibly older)
      *  TODO:   Implement timeout when polling devices
      */
 
@@ -103,7 +104,9 @@ void InitPS2()
         PS2Write(2, 0xF2);
         PS2Read();
         MouseID = PS2Read();
-        //kout << "Mouse ID = " <<DEC<< MouseID << "\n";
+
+        MousePacketSize = 3 + (UINT8)((bool)MouseID);
+        kout << "[PS/2]: Mouse ID = 0x " <<HEX<< MouseID << "\n";
     }
 
     //  Enable Keyboard
@@ -134,6 +137,8 @@ void InitPIT()
          */
         outb(PIC1_DATA, 0b11111111);
         outb(PIC2_DATA, 0b11111111);
+        //  Set PIT mode
+        outb(0x43, 0b00110110);
     }
 
     //  Reload can be whatever, might affect performance
@@ -141,12 +146,13 @@ void InitPIT()
     interrupt::msPerTick = ((double)Reload*1000)/PIC_FREQUENCY;
 
     //  Send the reload value to the PIT
-    outb(0x40, (UINT8)Reload);
-    outb(0x40, (UINT8)(Reload >> 8));
+    outb(0x40, Reload & 0xFF);
+    outb(0x40, (UINT8)((Reload >> 8) & 0xFF));
 
-    //  Unmask IRQ 0, 1, 2, 7
-    outb(PIC1_DATA, 0b01111001);
-
-    //  Unmask IRQ 12
+    /*
+     * Unmask IRQ 0, 1, 2, 7
+     * Unmask IRQ 12 and cascade IRQ 9
+     */
+    outb(PIC1_DATA, 0b01111000);
     outb(PIC2_DATA, 0b11101101);
 }
