@@ -17,11 +17,14 @@ Process::Process(const char *binaryPath)
 
     auto Entry = (void (*)(KERNEL_DESCRIPTOR*))elf::LoadELF64((Elf64_Ehdr*)fileBuf);
 
-    scheduler::Scheduler::ScheduleTask(new Task(
-            (UINT64)Entry,
-            true,
-            (TASK_ARG*)KernelDescriptor
-    ));
+    /*
+     * Cannot use new operator here, must use SysMalloc so that t persists
+     * after it's creating process terminates
+     */
+    Task *t = (Task*)SysMalloc(sizeof(Task));
+    t->Constructor((UINT64)Entry, true, (TASK_ARG*)KernelDescriptor);
+
+    scheduler::Scheduler::ScheduleTask(t);
 }
 
 Process::~Process() { }
