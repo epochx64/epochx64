@@ -3,67 +3,153 @@
 void* operator new ( size_t count ){ return heap::malloc(count); }
 void* operator new[] ( size_t count ) { return heap::malloc(count); }
 
-namespace heap
-{
-    //  2MB page-aligned heap
+void operator delete (void* ptr, UINT64 len) { heap::free(ptr); }
+void operator delete[] (void* ptr, UINT64 len) { heap::free(ptr); }
+
+namespace heap {
+    // 2MB page-aligned heap
     UINT8 __attribute__((aligned(4096))) pHeap[0x200000];
-    UINT64 HeapSize = 0x200000;
 
-    void*
-    malloc(UINT64 size)
+    // Size of heap in bytes
+    UINT64 heapSize = 0x200000;
+
+    // Number of occupied bytes in the heap
+    UINT64 occupiedBytes = 0;
+
+    // Pointer to first free BLOCK_HDR
+    BLOCK_HDR *head = (BLOCK_HDR *) pHeap;
+
+    /// Must be called only once, before using the malloc/free functions
+    void init()
     {
-        //TODO: turn this into smaller easier functions, it very ugly function, also more documentation
-        //      Maybe also use a better algorithm
-        //TODO: Track RAM usage
-        void            *found          = nullptr;
-        block_info_t    *p_block_info   = nullptr;
-        UINT64        i_heap_index    = 0;
+        head->size = heapSize - sizeof(BLOCK_HDR);
 
-        while(true)
+        head->nextFree = nullptr;
+        head->prevFree = nullptr;
+    }
+
+    /// Takes a free block and sets it as occupied by modifying the pointers in the linked-list structure.
+    /// Will use ALL free space in the block
+    /// \param block Pointer to the block
+    void allocFull(BLOCK_HDR *block)
+    {
+        if(block == head) head = block->nextFree;
+
+        // Correct the pointers on the previous & next free block
+        if(block->prevFree) block->prevFree->nextFree = block->nextFree;
+        if(block->nextFree) block->nextFree->prevFree = block->prevFree;
+    }
+
+    /// Takes a free block and allocates only some of its space, taking the rest and making a new free block
+    /// \param block Pointer to the block
+    /// \param size Number of bytes being allocated
+    void allocPartial(BLOCK_HDR *block, UINT64 size)
+    {
+        auto newBlock = (BLOCK_HDR*)((UINT64)block + sizeof(BLOCK_HDR) + size);
+
+        // Set the new block's pointers & attributes
+        newBlock->prevFree = block->prevFree;
+        newBlock->nextFree = block->nextFree;
+        newBlock->size = block->size - size - sizeof(BLOCK_HDR);
+
+        block->size -= newBlock->size + sizeof(BLOCK_HDR);
+
+        if(block == head) head = newBlock;
+
+        // Correct the pointers on the previous & next free block
+        if(block->prevFree) block->prevFree->nextFree = newBlock;
+        if(block->nextFree) block->nextFree->prevFree = newBlock;
+    }
+
+    /// Takes two blocks and merges them into one free block (preserving the LEFT block)
+    /// \param left Left block in either free or occupied state
+    /// \param right Right block in either free or occupied state
+    /// \param rightState true if right is occupied, false if right is free
+    void merge(BLOCK_HDR *left, BLOCK_HDR *right, bool rightState)
+    {
+        if(!rightState)
         {
-            p_block_info = (block_info_t*)( (UINT64)pHeap + i_heap_index );
+            left->nextFree = right->nextFree;
 
-            //  This block has never been touched
-            //  we will assume all memory after it
-            //  is free
-            if ( p_block_info->data_size == 0 )
-            {
-                p_block_info->data_size     = size;
-                p_block_info->block_flags   = BLOCK_OCCUPIED;
+            if(right->nextFree)
+                right->nextFree->prevFree = left;
 
-                found = (void*)( (uint64_t)p_block_info + sizeof(block_info_t) );
-                return found;
-            }
-
-            //  Break if large enough and not occupied
-            if ( !(p_block_info->block_flags & BLOCK_OCCUPIED) && p_block_info->data_size >= size )
-                break;
-
-            i_heap_index += sizeof(block_info_t) + p_block_info->data_size;
+            if(left->prevFree)
+                left->prevFree->nextFree = left;
         }
 
-        found                       = (void*)( (uint64_t)p_block_info + sizeof(block_info_t) );
-        p_block_info->block_flags   = BLOCK_OCCUPIED;
+        left->size += right->size + sizeof(BLOCK_HDR);
+    }
 
-        //  If the size of the section we just took is large enough
-        //  to cut off and fit another block_info_t + at least 1 byte
-        //  we will do that to save space. If it's not we'll just waste
-        //  a few bytes
-        if ( p_block_info->data_size >= 1 + sizeof(block_info_t) + size )
+    /// Default heap memory allocator
+    /// \param size Number of bytes to allocate
+    /// \return
+    void *malloc(UINT64 size)
+    {
+        // TODO: Track RAM usage
+        auto heapIterator = head;
+
+        // Drill down the linked-list until a large enough block is found
+        while(heapIterator != nullptr && size > heapIterator->size)
+            heapIterator = heapIterator->nextFree;
+
+        // No more free blocks
+        if(heapIterator == nullptr) return nullptr;
+
+        // If the found block is perfectly sized, allocate the whole block
+        // Otherwise, the extra free space should be converted into a new block
+        if(heapIterator->size <= size + sizeof(BLOCK_HDR)) allocFull(heapIterator);
+        else allocPartial(heapIterator, size);
+
+        heapIterator->nextFree = nullptr;
+        heapIterator->prevFree = nullptr;
+
+        return (void*)((UINT64)heapIterator + sizeof(BLOCK_HDR));
+    }
+
+    /// Free function
+    /// \param ptr
+    void free(void *ptr)
+    {
+        auto block = (BLOCK_HDR*)((UINT64)ptr - sizeof(BLOCK_HDR));
+        auto heapIterator = head;
+
+        // Drill down the linked-list until we reach the next & previous free nodes to block
+        while(heapIterator->nextFree != nullptr && (UINT64)heapIterator->nextFree < (UINT64)block)
+            heapIterator = heapIterator->nextFree;
+
+        BLOCK_HDR *left = heapIterator;
+        BLOCK_HDR *right = heapIterator->nextFree;
+
+        // If the block comes before the head node, special case
+        if((UINT64)block < (UINT64)heapIterator)
         {
-            //  Size of the block before trim
-            uint64_t old_size = p_block_info->data_size;
-
-            //  Trim it and now look at the new block we're making after it
-            p_block_info->data_size     = size;
-            p_block_info                = (block_info_t*)( (uint64_t)p_block_info + sizeof(block_info_t) + size );
-
-            p_block_info->data_size     = old_size - sizeof(block_info_t) - size;
-            p_block_info->block_flags   = 0b00000000;
+            left = nullptr;
+            right = heapIterator;
+            head = block;
         }
 
-        //  If for whatever reason the for loop doesn't end up retu
-        return found;
+        block->prevFree = left;
+        block->nextFree = right;
+
+        // If no merging can be done
+        if( (!left || !ADJACENT(left, block)) && (!right || !ADJACENT(block, right)) )
+        {
+            if(left) left->nextFree = block;
+            if(right) right->prevFree = block;
+            return;
+        }
+
+        // If adjacent to a free block on the left, combine the two blocks
+        if (left && ADJACENT(left, block))
+        {
+            merge(left, block, true);
+            block = left;
+        }
+
+        // If adjacent to a free block on the right, combine
+        if(right && ADJACENT(block, right))
+            merge(block, right, false);
     }
 
     void *MallocAligned(UINT64 Size, UINT64 Align)
@@ -75,11 +161,6 @@ namespace heap
 
         return (void *)Return;
     }
-}
-
-namespace mem
-{
-
 }
 
 using namespace kernel;
@@ -109,6 +190,9 @@ void SysMemBitMapSet(UINT64 BlockID, UINT64 nBlocks)
 
 void *SysMalloc(UINT64 Size)
 {
+    /*
+     * TODO: Locking should be implemented ASAP
+     */
     UINT64 nBlocks = Size/4096 + 1;
 
     UINT64 BlockID = 0;

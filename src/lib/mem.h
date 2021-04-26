@@ -9,6 +9,9 @@ typedef uint8_t byte;
 void* operator new   ( size_t count );
 void* operator new[] ( size_t count );
 
+void operator delete (void *ptr, UINT64 len);
+void operator delete[] (void *ptr, UINT64 len);
+
 void SysMemBitMapSet(UINT64 BlockID, UINT64 nBlocks = 1);
 void *SysMalloc(UINT64 Size);
 
@@ -41,6 +44,11 @@ namespace mem
 
 namespace heap
 {
+    void init();
+
+    void free(void *ptr);
+    void *malloc(UINT64 size);
+
     /*
      * malloc function but with align
      */
