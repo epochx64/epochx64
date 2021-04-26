@@ -18,6 +18,8 @@ void _epochstart(KERNEL_DESCRIPTOR *kernelDescriptor)
 
     kernel::RAMDisk = (ext2::RAMDisk*)KernelDescriptor->pRAMDisk;
 
+    heap::init();
+
     main();
 
     while (true);
