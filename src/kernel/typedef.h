@@ -5,6 +5,23 @@
 #include <boot/boot.h>
 #include <boot/shared_boot_defs.h>
 
+namespace heap
+{
+    /// Block Header. Comes before every block of data in the heap.
+    typedef struct BLOCK_HDR
+    {
+        UINT64 size;            // Number of bytes starting right after the BLOCK_HDR
+
+        BLOCK_HDR *prevFree;    // Pointer to previous free BLOCK
+        BLOCK_HDR *nextFree;    // Pointer to the next free BLOCK
+    } __attribute__((packed)) BLOCK_HDR;
+
+    extern BLOCK_HDR *head;
+
+    // A must be to the left of B
+    #define ADJACENT(A,B) ((UINT64)A + sizeof(BLOCK_HDR) + A->size == (UINT64)B)
+}
+
 namespace interrupt
 {
     #define PIC1_CMD        0x20
@@ -121,6 +138,27 @@ namespace ACPI
         SDT_HEADER SDTHeader;
         UINT64 pSDTArray[];
     } __attribute__((packed)) EXTENDED_SYSTEM_DESCRIPTOR_TABLE;
+
+    typedef struct
+    {
+        SDT_HEADER header;
+        UINT8 hardware_rev_id;
+        UINT8 comparator_count:5;
+        UINT8 counter_size:1;
+        UINT8 reserved1:1;
+        UINT8 legacy_replacement:1;
+        UINT16 pci_vendor_id;
+
+        UINT8 address_space_id;    // 0 - system memory, 1 - system I/O
+        UINT8 register_bit_width;
+        UINT8 register_bit_offset;
+        UINT8 reserved2;
+        UINT64 address;
+
+        UINT8 hpet_number;
+        UINT16 minimum_tick;
+        uint8_t page_protection;
+    } __attribute__((packed)) HPET_DESCRIPTOR_TABLE;
 
     typedef struct
     {
