@@ -7,6 +7,7 @@ typedef UINT64 EFI_VIRTUAL_ADDRESS;
 #define FRAMEBUFFER_BYTES_PER_PIXEL 4
 #define INITRD_SIZE_BYTES 0x800000
 
+/// From UEFISpec.h
 typedef struct {
     ///
     /// Type of the memory region.
@@ -50,6 +51,7 @@ typedef struct
     UINT8 Bits;
 } FRAMEBUFFER_INFO;
 
+/// From UEFISpec.h
 typedef struct
 {
     UINT16  Year;           //  1900-9999
@@ -89,13 +91,16 @@ typedef struct
     UINT32 APICBase;
     UINT32 APICInitCount;
 
-    UINT64 pSchedulers;
-    UINT64 pTaskInfos;
+    UINT64 pHPET;                       //  Pointer to the HPET registers
+    UINT64 HPETPeriod;                  //  Period in femptoseconds
 
-    UINT64 nCores;
+    UINT64 pSchedulers;                 //  Pointer to array of Scheduler pointers
+    UINT64 pTaskInfos;                  //  Pointer to array of TASK_INFO pointers
+
+    UINT64 nCores;                      //  Number of cores detected
 
     UINT64 szKernelFunctionList;
-    UINT64 *KernelFunctionList;
+    UINT64 *KernelFunctionList;         //  Pointer to array of function pointers
 } KERNEL_DESCRIPTOR;
 
 #endif
