@@ -99,7 +99,18 @@ void Scheduler::RemoveCurrentTask()
     {
         /* Reset member variables of the current task */
         currentTask->ended = false;
-        currentTask->startTime += currentTask->periodNanoSeconds;
+
+        /* If the task took longer to execute than its period */
+        if(currentTime > currentTask->startTime + currentTask->periodNanoSeconds)
+        {
+            /* Reschedule immediately */
+            currentTask->startTime = currentTime;
+        }
+        else
+        {
+            /* Reschedule after one period has elapsed since previous call */
+            currentTask->startTime += currentTask->periodNanoSeconds;
+        }
 
         /* Reset registers of the current task */
         *(UINT64*)currentTask->pStack = (UINT64)&ReturnFrame;
