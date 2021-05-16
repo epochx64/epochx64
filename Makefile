@@ -25,7 +25,7 @@ LIB_TARGETS = epstring mem math/math elf/relocation ../fs/ext2
 ASM_TARGETS = lib/asm/asm kernel/interrupt
 
 #TODO:	So far this will only work with one target
-PROC_TARGETS = test
+PROC_TARGETS = test dwm
 
 all: efi $(KERNEL_TARGETS) $(LIB_TARGETS) $(ASM_TARGETS) $(PROC_TARGETS) link
 
@@ -39,12 +39,12 @@ efi:
 # Kernel components
 $(KERNEL_TARGETS):
 	@$(CXX) -c $(SRC_LOC)/kernel/$@.cpp $(CFLAGS) $(INCLUDES) -o ./obj/$(lastword $(subst /, ,$@)).obj
-	@echo "CPP $@.cpp"
+	@echo "CXX $@.cpp"
 
 # Lib components
 $(LIB_TARGETS):
 	@$(CXX) -c $(SRC_LOC)/lib/$@.cpp $(CFLAGS) $(INCLUDES) -o ./obj/$(lastword $(subst /, ,$@)).obj
-	@echo "CPP $@.cpp"
+	@echo "CXX $@.cpp"
 
 $(ASM_TARGETS):
 	@$(NASM) $(NASMFLAGS) $(SRC_LOC)/$@.s -o ./obj/$(lastword $(subst /, ,$@))_s.obj

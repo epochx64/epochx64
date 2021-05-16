@@ -66,6 +66,9 @@ void KeMain(KE_SYS_DESCRIPTOR *kernelInfo)
     /* Set the blocks which store the SysMemory bitmap as occupied */
     KeSysMemBitmapSet(0, keSysDescriptor->sysMemoryBitMapSize/BLOCK_SIZE + 1);
 
+    double sysMemSize = (double)keSysDescriptor->sysMemorySize / 0x40000000;
+    log::kout << "Free SysMemory: "<<DOUBLE_DEC << sysMemSize << "GiB\n";
+
     /*
      * Setup IDT, PS/2 devices, PIT, and APIC timer
      * Interrupts enabled after here
@@ -79,18 +82,12 @@ void KeMain(KE_SYS_DESCRIPTOR *kernelInfo)
 
     //CalibrateAPIC(1e4);
 
-    /* Temporary */
-    {
-        using namespace log;
+    /* Initialize RAM disk */
+    keRamDisk = new ext2::RAMDisk(keSysDescriptor->pRAMDisk, INITRD_SIZE_BYTES, false);;
 
-        keRamDisk = new ext2::RAMDisk(keSysDescriptor->pRAMDisk, INITRD_SIZE_BYTES, false);;
-
-        double sysMemSize = (double)keSysDescriptor->sysMemorySize / 0x40000000;
-        kout << "Free SysMemory: "<<DOUBLE_DEC << sysMemSize << "GiB\n";
-
-        /* Spawn a process (will change) */
-        Process p("/boot/test.elf");
-    }
+    /* Spawn a process (will change) */
+    Process p1("/boot/test.elf");
+    Process p2("/boot/dwm.elf");
 
     /* Start interrupts and make the CPU idle (this is now the idle task for scheduler 0) */
     sti();

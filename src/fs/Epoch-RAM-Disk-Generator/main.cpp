@@ -71,6 +71,7 @@ int main()
 
     ReadFileToRamDisk((TCHAR*)"index", (UINT8*)"/boot/index", &initRamDisk);
     ReadFileToRamDisk((TCHAR*)"test.elf", (UINT8*)"/boot/test.elf", &initRamDisk);
+    ReadFileToRamDisk((TCHAR*)"dwm.elf", (UINT8*)"/boot/dwm.elf", &initRamDisk);
 
     ext2::FILE testFile;
     {
