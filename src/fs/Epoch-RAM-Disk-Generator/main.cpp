@@ -1,9 +1,8 @@
 #include <iostream>
-#include <fs/ext2.h>
 #include <windows.h>
-#include <tchar.h>
+#include <fs/ext2.h>
 
-ext2::STATUS ReadFileToRAMDisk(TCHAR *WinPath, UINT8 *RAMPath, ext2::RAMDisk *RAMDisk)
+ext2::STATUS ReadFileToRamDisk(TCHAR *WinPath, UINT8 *RAMPath, ext2::RAMDisk *RAMDisk)
 {
     OVERLAPPED ol = {0};
 
@@ -23,8 +22,8 @@ ext2::STATUS ReadFileToRAMDisk(TCHAR *WinPath, UINT8 *RAMPath, ext2::RAMDisk *RA
     Low = GetFileSize(hFile, &High);
     FileSize = Low | ((UINT64)High >> 32);
 
-    auto ReadFileBuf = new UINT8[FileSize];
-    ReadFileEx(hFile, (LPVOID)ReadFileBuf, FileSize, &ol, nullptr);
+    auto readFileBuf = new UINT8[FileSize];
+    ReadFileEx(hFile, (LPVOID)readFileBuf, FileSize, &ol, nullptr);
 
     /*
      * Now write buffer to file in RAM Disk
@@ -35,7 +34,7 @@ ext2::STATUS ReadFileToRAMDisk(TCHAR *WinPath, UINT8 *RAMPath, ext2::RAMDisk *RA
     File.Size = FileSize;
     ::string::strncpy(RAMPath, File.Path, MAX_PATH);
 
-    RAMDisk->WriteFile(&File, ReadFileBuf);
+    RAMDisk->WriteFile(&File, readFileBuf);
 
     return STATUS_OK;
 }
@@ -66,29 +65,29 @@ int main()
 {
     using namespace std;
 
-    auto RAMDiskBuffer = new UINT8[INITRD_SIZE_BYTES];
-    ext2::RAMDisk InitRAMDisk((UINT64)RAMDiskBuffer, INITRD_SIZE_BYTES);
-    InitRAMDisk.MakeDir((UINT8*)"/boot");
+    auto ramDiskBuffer = new UINT8[INITRD_SIZE_BYTES];
+    ext2::RAMDisk initRamDisk((UINT64)ramDiskBuffer, INITRD_SIZE_BYTES);
+    initRamDisk.MakeDir((UINT8*)"/boot");
 
-    ReadFileToRAMDisk((TCHAR*)"index", (UINT8*)"/boot/index", &InitRAMDisk);
-    ReadFileToRAMDisk((TCHAR*)"test.elf", (UINT8*)"/boot/test.elf", &InitRAMDisk);
+    ReadFileToRamDisk((TCHAR*)"index", (UINT8*)"/boot/index", &initRamDisk);
+    ReadFileToRamDisk((TCHAR*)"test.elf", (UINT8*)"/boot/test.elf", &initRamDisk);
 
-    ext2::FILE TestFile;
+    ext2::FILE testFile;
     {
-        TestFile.Type = FILETYPE_REG;
-        ::string::strncpy((UINT8*)"/boot/index", TestFile.Path, MAX_PATH);
+        testFile.Type = FILETYPE_REG;
+        ::string::strncpy((UINT8*)"/boot/index", testFile.Path, MAX_PATH);
 
-        auto RDFileSz = InitRAMDisk.GetFileSize((UINT8*)"/boot/index");
-        auto ReadFileBuf = new UINT8[RDFileSz];
-        InitRAMDisk.ReadFile(&TestFile, ReadFileBuf);
+        auto readdFileSz = initRamDisk.GetFileSize((UINT8*)"/boot/index");
+        auto readFileBuf = new UINT8[readdFileSz];
+        initRamDisk.ReadFile(&testFile, readFileBuf);
 
-        WriteBufferToFile((TCHAR*)"ext2index", ReadFileBuf, TestFile.Size);
+        WriteBufferToFile((TCHAR*)"ext2index", readFileBuf, testFile.Size);
     }
 
     /*
      * Write the init RAM Disk to a file
      */
-    WriteBufferToFile("initrd.ext2", RAMDiskBuffer, INITRD_SIZE_BYTES);
+    WriteBufferToFile("initrd.ext2", ramDiskBuffer, INITRD_SIZE_BYTES);
 
     return 0;
 }

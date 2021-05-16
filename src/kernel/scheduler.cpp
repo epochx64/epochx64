@@ -1,110 +1,336 @@
 #include "scheduler.h"
 
-namespace ACPI
+/**********************************************************************
+ *  Global variables
+ *********************************************************************/
+extern UINT64 nCores;
+
+/* Array (size = nCores) of pointers to Schedulers */
+Scheduler **keSchedulers;
+
+/* Array (size = nCores) of pointers to KE_TASK_DESCRIPTOR */
+KE_TASK_DESCRIPTOR **keTasks;
+
+/**********************************************************************
+ *  Function definitions
+ *********************************************************************/
+
+/**********************************************************************
+ *  @details Scheduler constructor
+ *  @param core - Core number that the scheduler is assigned to
+ *********************************************************************/
+Scheduler::Scheduler(UINT64 core)
 {
-    extern UINT64 nCores;
+    /* Initialize member variables */
+    isLocked = false;
+    coreID = core;
+    nTasks = 1;
+
+    /* Initialize idle task */
+    currentTask = new Task(0, 0, false, 0, nullptr);
+    currentTask->ID = 0;
+    idleTask = currentTask;
+    schedule.heap[0] = idleTask;
+
+    /* Set the active task to idle task */
+    activeTaskList = idleTask;
+    keTasks[coreID] = currentTask->pTaskInfo;
 }
 
-namespace scheduler
+/**********************************************************************
+ *  @details Gets time elapsed since system startup
+ *  @return Number of nanoseconds since system startup
+ *********************************************************************/
+KE_TIME Scheduler::GetCurrentTime()
 {
-    Scheduler **Schedulers;
+    /* Update the time using the current HPET counter register value */
+    UINT64 hpetCounter = *(UINT64*)(keSysDescriptor->pHPET + 0xF0);
+    return hpetCounter*((double)keSysDescriptor->hpetPeriod/1e6);
+}
 
-    //  An array of TASK_INFO pointers
-    //  Size will be number of cores
-    //  Used for linkage with ASM component
-    TASK_INFO **TASK_INFOS;
+/**********************************************************************
+ *  @details Adds a task to the priority queue
+ *  @param t - Task to add
+ *********************************************************************/
+void Scheduler::AddTask(Task *t)
+{
+    schedule.Insert(t);
+    nTasks++;
+}
 
-    /*
-     *  TODO:   There are a few functions that will need to be changed once deallocating tasks is implemented
-     */
+/**********************************************************************
+ *  @details Called by the scheduler when a task completes
+ *  @param t - Task to add
+ *  @return Number of nanoseconds since system startup
+ *********************************************************************/
+void Scheduler::RemoveCurrentTask()
+{
+    nTasks--;
 
-    Scheduler::Scheduler(bool Root, UINT64 Core)
+    /* Traverse the linked list to get the previous element before currentTask */
+    Task *currentTaskIter = activeTaskList;
+    Task *currentTaskIterPrev = nullptr;
+    while(currentTaskIter != nullptr && currentTaskIter != currentTask)
     {
-        /*
-         * We're gonna have max 64 tasks for now
-         */
-        pTasks = new UINT64[64];
-        CoreID = Core;
-        nTasks = 1;
-        Ticks = 0;
-
-        /*
-         * The idle task
-         */
-        CurrentTask = new Task(0, true, nullptr);
-        CurrentTask->ID = 0;
-        CurrentTask->Enabled = true;
-        pTasks[0] = (UINT64)CurrentTask;
-
-        TASK_INFOS[CoreID] = CurrentTask->pTaskInfo;
+        currentTaskIterPrev = currentTaskIter;
+        currentTaskIter = currentTaskIter->nextActiveTask;
     }
 
-    void Scheduler::AddTask(Task *T)
+    /* If the current task is the first in the list */
+    if(currentTaskIterPrev == nullptr)
     {
-        //  TODO: This will have to change
-        T->ID = nTasks;
-        pTasks[nTasks] = (UINT64)T;
-        nTasks++;
+        /* Remove task */
+        activeTaskList = currentTaskIter->nextActiveTask;
+    }
+    else
+    {
+        /* Remove task */
+        currentTaskIterPrev->nextActiveTask = currentTaskIter->nextActiveTask;
     }
 
-    void Scheduler::Tick()
+    /* Idle if there are no tasks to perform */
+    if(activeTaskList == nullptr)
     {
-        //  TODO:   Not every tick should result in a task switch
-        CurrentTask = (Task*)pTasks[(CurrentTask->ID + 1) % nTasks];
-        TASK_INFOS[CoreID] = ((Task*)pTasks[CurrentTask->ID])->pTaskInfo;
-        Ticks++;
+        activeTaskList = idleTask;
     }
 
-    void Scheduler::ScheduleTask(Task *T)
+    /* If the current task is meant to repeat */
+    if(currentTask->reschedule)
     {
-        UINT64 chosenOne = 0;
+        /* Reset member variables of the current task */
+        currentTask->ended = false;
+        currentTask->startTime += currentTask->periodNanoSeconds;
 
-        for(UINT64 i = 1; i < kernel::KernelDescriptor->nCores; i++)
-        {
-            if (Schedulers[chosenOne]->nTasks > Schedulers[i]->nTasks) chosenOne = i;
-        }
+        /* Reset registers of the current task */
+        *(UINT64*)currentTask->pStack = (UINT64)&ReturnFrame;
+        currentTask->pTaskInfo->rsp = currentTask->pStack;
+        currentTask->pTaskInfo->rbp = currentTask->pStack;
+        currentTask->pTaskInfo->rdi = (UINT64)currentTask->args;
+        currentTask->pTaskInfo->IRETQCS = 0x08;
+        currentTask->pTaskInfo->IRETQRFLAGS = 0x202;
+        currentTask->pTaskInfo->IRETQRIP = currentTask->pEntryPoint;
 
-        Schedulers[chosenOne]->AddTask(T);
+        /* Reschedule the task */
+        AddTask(currentTask);
+    }
+    else
+    {
+        /* TODO: Add a destructor for tasks */
+        delete currentTask;
     }
 
-    Task::Task(UINT64 Entry, bool Enabled, TASK_ARG* TaskArgs)
+    currentTask = activeTaskList;
+}
+
+/**********************************************************************
+ *  @details Called every APIC timer interrupt
+ *********************************************************************/
+void Scheduler::Tick()
+{
+    /* Update current time */
+    currentTime = GetCurrentTime();
+
+    /* If a task is currently editing the scheduler return to the task and let it finish */
+    if(isLocked) return;
+
+    /* If the current task is finished, remove/reschedule it */
+    if(currentTask->ended) RemoveCurrentTask();
+
+    /* Check the priority queue for any tasks that need to start executing */
+    while ( (schedule.size >= 1) && (schedule.heap[1]->startTime <= currentTime) )
     {
-        Constructor(Entry, Enabled, TaskArgs);
+        /* Remove task from top of priority queue */
+        Task *newActiveTask = schedule.Deque();
+
+        /* If there are no active tasks, stop idling */
+        if(activeTaskList == idleTask) newActiveTask->nextActiveTask = nullptr;
+        else newActiveTask->nextActiveTask = activeTaskList;
+
+        /* The new task is now the first element in the list */
+        activeTaskList = newActiveTask;
     }
 
-    Task::Task()
-    {
+    /* If the current active task is at the end of the list, go back to beginning of the list */
+    if(currentTask->nextActiveTask == nullptr) currentTask = activeTaskList;
+    else currentTask = currentTask->nextActiveTask;
 
+    /* Set current task in the global task structure */
+    keTasks[coreID] = currentTask->pTaskInfo;
+}
+
+/**********************************************************************
+ *  @details Adds a task to the scheduler with the least amount of tasks
+ *  @param t - Task to add
+ *********************************************************************/
+void Scheduler::ScheduleTask(Task *t)
+{
+    UINT64 chosenOne = 0;
+
+    for(UINT64 i = 1; i < keSysDescriptor->nCores; i++)
+    {
+        if (keSchedulers[chosenOne]->nTasks > keSchedulers[i]->nTasks)
+            chosenOne = i;
     }
 
-    void Task::Constructor(UINT64 Entry, bool Enabled, TASK_ARG *TaskArgs)
+    keSchedulers[chosenOne]->isLocked = true;
+    keSchedulers[chosenOne]->AddTask(t);
+    keSchedulers[chosenOne]->isLocked = false;
+}
+
+/**********************************************************************
+ *  @details Called immediately after a task finishes
+ *********************************************************************/
+void ReturnFrame()
+{
+    UINT64 coreID = APICID();
+    auto scheduler = keSchedulers[coreID];
+    auto currentTask = scheduler->currentTask;
+
+    //log::kout << "I HAVE RETURNED!\n";
+
+    /* Lock the scheduler to prevent it from accessing the structure we're about to edit */
+    scheduler->isLocked = true;
+
+    /* Signal to the scheduler that the task is completed */
+    currentTask->ended = true;
+
+    /* Unlock the scheduler */
+    scheduler->isLocked = false;
+
+    /* Wait for the scheduler tick */
+    hlt();
+}
+
+/**********************************************************************
+ *  @details Task constructor
+ *  @param entry - Pointer to entry point
+ *  @param startTime - Kernel time when the task should begin
+ *  @param reschedule - True if you want the task to repeatedly run
+ *  @param periodNanoSeconds - Period of the task in nanoseconds
+ *  @param taskArgs - Array of pointers to task arguments
+ *********************************************************************/
+Task::Task(UINT64 entry, KE_TIME startTime, bool reschedule, KE_TIME periodNanoSeconds, KE_TASK_ARG* taskArgs)
+{
+    /* Initialize member variables */
+    this->reschedule = reschedule;
+    this->startTime = startTime;
+    this->periodNanoSeconds = periodNanoSeconds;
+    this->args = taskArgs;
+    this->nextActiveTask = nullptr;
+    this->pEntryPoint = entry;
+    this->ended = false;
+
+    this->pTaskInfo   = (KE_TASK_DESCRIPTOR*)KeSysMalloc(sizeof(KE_TASK_DESCRIPTOR));
+    this->pStack      = (UINT64)KeSysMalloc(STACK_SIZE + 1) + STACK_SIZE;
+
+    /* Zero out the newly allocated KE_TASK_DESCRIPTOR */
+    for(UINT64 i = 0; i < sizeof(KE_TASK_DESCRIPTOR); i+=8)
+        *(UINT64*)((UINT64)pTaskInfo + i) = 0;
+
+    /* Set registers */
+    *(UINT64*)pStack = (UINT64)&ReturnFrame;
+    pTaskInfo->rsp = pStack;
+    pTaskInfo->rbp = pStack;
+    pTaskInfo->rdi = (UINT64)taskArgs;
+    pTaskInfo->IRETQCS = 0x08;
+    pTaskInfo->IRETQRFLAGS = 0x202;
+    pTaskInfo->IRETQRIP = entry;
+
+    /* Mask all exceptions in MXCSR (used in FXSAVE and FXRSTOR)
+     * Otherwise, floating point instructions will cause an exception */
+    *((UINT32*)((UINT64)pTaskInfo + 0x18)) |= 0x00001F80;
+}
+
+/**********************************************************************
+ *  @details Task destructor
+ *********************************************************************/
+Task::~Task()
+{
+
+}
+
+/**********************************************************************
+ *  @details Priority queue constructor
+ *********************************************************************/
+PriorityQueue::PriorityQueue()
+{
+    heap = new Task*[INIT_PQ_SIZE];
+    maxSize = INIT_PQ_SIZE;
+    size = 0;
+}
+
+/**********************************************************************
+ *  @details Heapify subroutine for minheap
+ *  @param index - Node index to perform the operation
+ *********************************************************************/
+void PriorityQueue::Heapify(UINT64 index)
+{
+    UINT64 left;
+    UINT64 right;
+    UINT64 min;
+
+    /* Iterative approach instead of recursive approach */
+    while(index < size)
     {
-        this->Enabled = Enabled;
+        left = index*2;
+        right = index*2 + 1;
+        min = index;
 
-        pTaskInfo   = (TASK_INFO*)SysMalloc(sizeof(TASK_INFO));
-        pStack      = (UINT64)SysMalloc(STACK_SIZE + 1) + STACK_SIZE;
+        if(left <= size && heap[left]->startTime < heap[index]->startTime)
+            min = left;
 
-        for(UINT64 i = 0; i < (1 + sizeof(TASK_INFO)/0x1000)*0x1000; i+=8)
-            *(UINT64*)((UINT64)pTaskInfo + i) = 0;
-        //log::kout   << "PTINFO: 0x" <<HEX<< (UINT64)pTaskInfo << "\n"
-        //            << "PSTACK: 0x" <<HEX<< (UINT64)pStack << "\n";
+        if(right <= size && heap[right]->startTime < heap[min]->startTime)
+            min = right;
 
-        /*
-         * TODO:    When scheduler prepares a task, it needs to setup a new stack frame. When the task's
-         *          main function returns, it needs to go to a special handler which signals to the scheduler
-         *          that the task is over, and halts until it's killed
-         */
-        pTaskInfo->rsp = (UINT64)pStack;
-        pTaskInfo->rbp = (UINT64)pStack;
-        pTaskInfo->rdi = (UINT64)TaskArgs;
-        pTaskInfo->IRETQCS = 0x08;
-        pTaskInfo->IRETQRFLAGS = 0x206;
-        pTaskInfo->IRETQRIP = Entry;
+        if(min == index) return;
 
-        /*
-         * Mask all exceptions in MXCSR (used in FXSAVE and FXRSTOR)
-         * Otherwise, floating point instructions will cause an exception
-         */
-        *((UINT32*)((UINT64)pTaskInfo + 0x18)) |= 0x00001F80;
+        mem::swap(heap[index], heap[min]);
+        index = min;
     }
+}
+
+/**********************************************************************
+ *  @details Insert a task into the priority queue
+ *  @param t - Task to insert
+ *********************************************************************/
+void PriorityQueue::Insert(Task *t)
+{
+    /* Increase the heap size */
+    if(++size > maxSize - 1)
+    {
+        auto newHeap = new Task*[maxSize*2];
+        for(UINT64 i = 0; i < maxSize; i++)
+            newHeap[i] = heap[i];
+
+        delete[] heap;
+        heap = newHeap;
+
+        maxSize *= 2;
+    }
+
+    /* Place the new member at the end of the heap */
+    heap[size] = t;
+
+    /* Obtain index of the new member's parent node */
+    UINT64 parent = size/2;
+
+    /* Climb up the tree and heapify each node to move the new task into correct spot */
+    while(parent > 0)
+    {
+        Heapify(parent);
+        parent /= 2;
+    }
+}
+
+/**********************************************************************
+ *  @details Remove and get the task at the top of the priority queue
+ *  @returns Task at index 1 of minheap
+ *********************************************************************/
+Task *PriorityQueue::Deque()
+{
+    Task *retVal = heap[1];
+    heap[1] = heap[size--];
+    Heapify(1);
+
+    return retVal;
 }

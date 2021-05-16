@@ -2,24 +2,23 @@
 
 namespace interrupt
 {
-    extern double msPerTick;
+    extern "C" void int49();
+    extern double nsPerTick;
 }
 
 UINT8 MouseID;
 UINT8 MousePacketSize;
 
-UINT8 PS2Read()
+UINT8 KePS2Read()
 {
-    using namespace ASMx64;
+
     while(!(inb(0x64) & 1));
 
     return inb(0x60);
 }
 
-void PS2Write(UINT8 Port, UINT8 Value)
+void KePS2Write(UINT8 Port, UINT8 Value)
 {
-    using namespace ASMx64;
-
     if(Port == 2)
     {
         while(inb(0x64) & 2);
@@ -30,9 +29,9 @@ void PS2Write(UINT8 Port, UINT8 Value)
     outb(0x60, Value);
 }
 
-void InitPS2()
+void KeInitPS2()
 {
-    using namespace ASMx64;
+
     using namespace log;
 
     /*  TODO:   This init sequence doesn't work on some hardware (possibly older)
@@ -59,13 +58,13 @@ void InitPS2()
         outb(PS2_COMMAND_PORT, 0x20);
 
         while(!(inb(PS2_COMMAND_PORT) & 1));
-        UINT8 result = (inb(0x60) & (~0b00100000)) | 0b00000010;
+        UINT8 result = (inb(0x60) & (~0b00110000)) | 0b00000011;
 
         while(inb(PS2_COMMAND_PORT) & 2);
         outb(PS2_COMMAND_PORT, 0x60);
 
         while(inb(PS2_COMMAND_PORT) & 2);
-        PS2Write(1, result);
+        KePS2Write(1, result);
     }
 
     /*
@@ -74,15 +73,15 @@ void InitPS2()
     {
         while(inb(0x64) & 2);
         outb(PS2_COMMAND_PORT, 0xAA);
-        if(PS2Read() != 0x55) kout << "Self test FAIL\n";
+        if(KePS2Read() != 0x55) kout << "Self test FAIL\n";
 
         while(inb(0x64) & 2);
         outb(PS2_COMMAND_PORT, 0xAB);
-        if(PS2Read()) kout << "Port 1 test FAIL\n";
+        if(KePS2Read()) kout << "Port 1 test FAIL\n";
 
         while(inb(0x64) & 2);
         outb(PS2_COMMAND_PORT, 0xA9);
-        if(PS2Read()) kout << "Port 2 test FAIL\n";
+        if(KePS2Read()) kout << "Port 2 test FAIL\n";
     }
 
     /*
@@ -94,19 +93,19 @@ void InitPS2()
         outb(PS2_COMMAND_PORT, 0xA8);
 
         //  Configure mouse
-        PS2Write(2, 0xF6);
-        PS2Read();
+        KePS2Write(2, 0xF6);
+        KePS2Read();
 
-        PS2Write(2, 0xF4);
-        PS2Read();
+        KePS2Write(2, 0xF4);
+        KePS2Read();
 
         //  Get mouse ID
-        PS2Write(2, 0xF2);
-        PS2Read();
-        MouseID = PS2Read();
+        KePS2Write(2, 0xF2);
+        KePS2Read();
+        MouseID = KePS2Read();
 
         MousePacketSize = 3 + (UINT8)((bool)MouseID);
-        kout << "[PS/2]: Mouse ID = 0x " <<HEX<< MouseID << "\n";
+        kout << "[ PS/2 ]: Mouse ID = 0x" <<HEX<< MouseID << "\n";
     }
 
     //  Enable Keyboard
@@ -114,10 +113,8 @@ void InitPS2()
     outb(PS2_COMMAND_PORT, 0xAE);
 }
 
-void InitPIT()
+void KeInitPIC()
 {
-    using namespace ASMx64;
-
     //  Initialization of PIC
     {
         outb(PIC1_COMMAND, ICW1_INIT | ICW1_ICW4);
@@ -131,28 +128,12 @@ void InitPIT()
 
         outb(PIC1_DATA, ICW4_8086);
         outb(PIC2_DATA, ICW4_8086);
-
-        /*
-         * Mask all IRQs
-         */
-        outb(PIC1_DATA, 0b11111111);
-        outb(PIC2_DATA, 0b11111111);
-        //  Set PIT mode
-        outb(0x43, 0b00110110);
     }
 
-    //  Reload can be whatever, might affect performance
-    UINT16 Reload = 0x1000;
-    interrupt::msPerTick = ((double)Reload*1000)/PIC_FREQUENCY;
-
-    //  Send the reload value to the PIT
-    outb(0x40, Reload & 0xFF);
-    outb(0x40, (UINT8)((Reload >> 8) & 0xFF));
-
     /*
-     * Unmask IRQ 0, 1, 2, 7
+     * Unmask IRQ 1, 2
      * Unmask IRQ 12 and cascade IRQ 9
      */
-    outb(PIC1_DATA, 0b01111000);
+    outb(PIC1_DATA, 0b11111001);
     outb(PIC2_DATA, 0b11101101);
 }

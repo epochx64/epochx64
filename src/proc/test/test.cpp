@@ -1,6 +1,6 @@
 #include "epoch.h"
 
-void gfxroutine(scheduler::TASK_ARG *TaskArgs)
+void gfxroutine(KE_TASK_ARG *TaskArgs)
 {
     double x = *((double*)TaskArgs[0]);
     double y = *((double*)TaskArgs[1]);
@@ -11,7 +11,6 @@ void gfxroutine(scheduler::TASK_ARG *TaskArgs)
     while (true)
     {
         using namespace graphics;
-        using namespace kernel;
         using namespace math;
 
         double divisions = 120.0;
@@ -21,7 +20,7 @@ void gfxroutine(scheduler::TASK_ARG *TaskArgs)
         for (double theta = 0.0; theta < 2*PI; theta += dtheta) {
             for (int j = 0; j < radius; j++)
                 PutPixel(RoundDouble<UINT64>(x + j*cos(theta)),RoundDouble<UINT64>(y + j*sin(theta)),
-                         &(KernelDescriptor->GOPInfo), c);
+                         &(keSysDescriptor->gopInfo), c);
         }
 
         c.u8_R += 10;
@@ -30,20 +29,23 @@ void gfxroutine(scheduler::TASK_ARG *TaskArgs)
     }
 }
 
+void testMsg()
+{
+    log::kout << "TEST\n";
+}
+
 int main()
 {
-    log::kout << "HELLO WORLD FROM test.elf    \n";
+    log::kout << "HELLO WORLDD FROM test.elf    \n";
 
-    auto T = new scheduler::Task(
-            (UINT64)&gfxroutine,
-            true,
-            new TASK_ARG[3] {
-                    (TASK_ARG)(new double(600.0 + 42.0)),
-                    (TASK_ARG)(new double(140.0)),
-                    (TASK_ARG)(new int(16))
-            });
+    KeScheduleTask((UINT64)&testMsg, KeGetTime(), true, 1e9, 0);
 
-    scheduler::Scheduler::ScheduleTask(T);
+    KeScheduleTask((UINT64)&gfxroutine, 0, false, 0,
+            new KE_TASK_ARG[3] {
+            (KE_TASK_ARG)(new double(600.0 + 42.0)),
+            (KE_TASK_ARG)(new double(140.0)),
+            (KE_TASK_ARG)(new int(16))
+    });
 
     return 0;
 }

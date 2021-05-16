@@ -1,4 +1,4 @@
-#include "relocation.h"
+#include <elf/relocation.h>
 
 namespace elf
 {
@@ -90,7 +90,7 @@ namespace elf
         UINT64 ProgramSize = GetProgramSize(ELFHeader);
 
         auto SectionHeaders = (Elf64_Shdr *)((UINT64)ELFHeader + ELFHeader->e_shoff);
-        auto pProgram = SysMalloc(ProgramSize);
+        auto pProgram = KeSysMalloc(ProgramSize);
 
         //  Zero out the memory we just allocated
         for(UINT64 i = 0; i < ProgramSize; i+=8) *(UINT64*)((UINT64)pProgram + i) = 0;

@@ -1,4 +1,4 @@
-#include "log.h"
+#include <log.h>
 
 namespace log
 {
@@ -36,7 +36,6 @@ namespace log
     void krnlout::PutChar(char c)
     {
         using namespace graphics;
-        using namespace kernel;
 
         switch (c)
         {
@@ -109,7 +108,7 @@ namespace log
 //        }
 //
 //#ifdef KERNEL_H
-//        ASMx64::outb(COM1, c);
+//        outb(COM1, c);
 //#endif
 //    }
 }

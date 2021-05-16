@@ -6,13 +6,14 @@
 #include <Guid/Acpi.h>
 #include <stddef.h>
 #include <elf.h>
-#include <boot/boot.h>
+#include <boot/shared_boot_defs.h>
 
-typedef __attribute__((sysv_abi)) void (*KERNEL_ENTRY)(KERNEL_DESCRIPTOR*);
+typedef __attribute__((sysv_abi)) void (*KERNEL_ENTRY)(KE_SYS_DESCRIPTOR*);
 
 EFI_HANDLE _ImageHandle;
 
 EFI_GET_TIME GetTime;
+EFI_SET_TIME SetTime;
 EFI_FREE_POOL FreePool;
 EFI_TEXT_STRING OutputString;
 EFI_ALLOCATE_POOL AllocatePool;
@@ -101,11 +102,12 @@ UINT8 *ReadFile(UINT16* Path)
 EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
     EFI_STATUS Status;
-    KERNEL_DESCRIPTOR KernelInfo;
+    KE_SYS_DESCRIPTOR KernelInfo;
 
     _ImageHandle = ImageHandle;
 
     GetTime = SystemTable->RuntimeServices->GetTime;
+    SetTime = SystemTable->RuntimeServices->SetTime;
     FreePool = SystemTable->BootServices->FreePool;
     OutputString =  SystemTable->ConOut->OutputString;
     AllocatePool = SystemTable->BootServices->AllocatePool;
@@ -166,7 +168,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         FramebufferInfo.Width           = GOPProtocol->Mode->Info->HorizontalResolution;
         FramebufferInfo.Pitch           = GOPProtocol->Mode->Info->PixelsPerScanLine*4;
 
-        KernelInfo.GOPInfo = FramebufferInfo;
+        KernelInfo.gopInfo = FramebufferInfo;
     }
 
     /*  Get ACPI info and stuff into KERNEL_INFO */
@@ -290,7 +292,8 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     if(EFI_ERROR(Status)) while(1);
 
     /*
-     * Find all free memory and map it to 0x000100000000
+     * Find all free memory and map it to 0x000100000000, keeping everything else identity map
+     * TODO: Find out a way to also identity map the free memory
      */
     {
         KernelInfo.pSysMemory = 0x000100000000;
@@ -300,7 +303,9 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             (UINT64)MemDescriptor < (UINT64)KernelInfo.MemoryMap + KernelInfo.MemoryMapSize;
             MemDescriptor = (EFI_MEM_DESCRIPTOR*)((UINT64)MemDescriptor + KernelInfo.DescriptorSize))
         {
-            if(MemDescriptor->Type == EfiConventionalMemory)
+            // Memory address 0x10000 is occupied by multicore bootstrap code
+            if  (MemDescriptor->Type == EfiConventionalMemory &&
+                (0x10000 < SysMemoryIterator || SysMemoryIterator + MemDescriptor->NumberOfPages*0x1000 < 0x10000))
             {
                 MemDescriptor->VirtualStart = SysMemoryIterator;
                 MemDescriptor->Attribute = EFI_MEMORY_RUNTIME;
@@ -312,9 +317,9 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             MemDescriptor->VirtualStart = MemDescriptor->PhysicalStart;
         }
 
-        KernelInfo.SysMemorySize = SysMemoryIterator - KernelInfo.pSysMemory;
+        KernelInfo.sysMemorySize = SysMemoryIterator - KernelInfo.pSysMemory;
         KernelInfo.pSysMemoryBitMap = KernelInfo.pSysMemory;
-        KernelInfo.SysMemoryBitMapSize = KernelInfo.SysMemorySize/0x1000/8 + 1;
+        KernelInfo.sysMemoryBitMapSize = KernelInfo.sysMemorySize/0x1000/8 + 1;
 
         Status = SetVirtualAddressMap (
                 KernelInfo.MemoryMapSize,
@@ -324,13 +329,6 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         );
         if (EFI_ERROR(Status)) while(1);
     }
-
-    /*
-     * Get the date and time, and put in kernel descriptor
-     * TODO: This won't be used forever, UEFI doesn't always give the correct time
-     *       Recommending to use NTP server (way down the line when networking is implemented) or some other method
-     */
-    GetTime((EFI_TIME*)&(KernelInfo.TimeDescriptor), NULL);
 
     KernelEntry(&KernelInfo);
 

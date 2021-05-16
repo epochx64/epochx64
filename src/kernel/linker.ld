@@ -1,4 +1,4 @@
-ENTRY(KernelMain)
+ENTRY(KeMain)
 
 SECTIONS
 {
@@ -12,7 +12,6 @@ SECTIONS
     {
         *(.apbootstrapdata)
     }
-
     . = 0x10000;
 
     .apbootstrap ALIGN (4K) : AT (ADDR(.apbootstrap))
@@ -38,7 +37,7 @@ SECTIONS
 	}
 
 	.data ALIGN (4K) : AT (ADDR (.data))
-    	{
-    		*(.data)
-    	}
+    {
+    	*(.data)
+    }
 }

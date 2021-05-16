@@ -4,9 +4,10 @@ void* operator new ( size_t count ){ return heap::malloc(count); }
 void* operator new[] ( size_t count ) { return heap::malloc(count); }
 
 void operator delete (void* ptr, UINT64 len) { heap::free(ptr); }
-void operator delete[] (void* ptr, UINT64 len) { heap::free(ptr); }
+void operator delete[] (void* ptr) { heap::free(ptr); }
 
-namespace heap {
+namespace heap
+{
     // 2MB page-aligned heap
     UINT8 __attribute__((aligned(4096))) pHeap[0x200000];
 
@@ -163,14 +164,12 @@ namespace heap {
     }
 }
 
-using namespace kernel;
-
-void SysMemBitMapSet(UINT64 BlockID, UINT64 nBlocks)
+void KeSysMemBitmapSet(UINT64 BlockID, UINT64 nBlocks)
 {
     UINT64 SetBlocks = 0;
 
-    for(auto BitMapIter = (UINT8*)(KernelDescriptor->pSysMemoryBitMap + (BlockID/8));
-        (UINT64)BitMapIter < (UINT64)(KernelDescriptor->pSysMemoryBitMap + KernelDescriptor->SysMemoryBitMapSize);
+    for(auto BitMapIter = (UINT8*)(keSysDescriptor->pSysMemoryBitMap + (BlockID/8));
+        (UINT64)BitMapIter < (UINT64)(keSysDescriptor->pSysMemoryBitMap + keSysDescriptor->sysMemoryBitMapSize);
         BitMapIter++)
     {
         for (UINT8 Mask = 1, i = 0; i < 8; Mask <<= 1, i++)
@@ -188,7 +187,7 @@ void SysMemBitMapSet(UINT64 BlockID, UINT64 nBlocks)
     }
 }
 
-void *SysMalloc(UINT64 Size)
+void *KeSysMalloc(UINT64 Size)
 {
     /*
      * TODO: Locking should be implemented ASAP
@@ -201,8 +200,8 @@ void *SysMalloc(UINT64 Size)
     /*
      * Run through the bitmap to find a contiguous chunk of memory
      */
-    for(auto BitMapIter = (UINT8*)(KernelDescriptor->pSysMemoryBitMap);
-        (UINT64)BitMapIter < (UINT64)(KernelDescriptor->pSysMemoryBitMap + KernelDescriptor->SysMemoryBitMapSize);
+    for(auto BitMapIter = (UINT8*)(keSysDescriptor->pSysMemoryBitMap);
+        (UINT64)BitMapIter < (UINT64)(keSysDescriptor->pSysMemoryBitMap + keSysDescriptor->sysMemoryBitMapSize);
         BitMapIter++)
     {
         for (UINT8 Mask = 1, i = 0; i < 8; Mask <<= 1, i++)
@@ -217,8 +216,8 @@ void *SysMalloc(UINT64 Size)
 
             if(++nFoundBlocks >= nBlocks)
             {
-                SysMemBitMapSet(BlockID - nBlocks, nBlocks);
-                return (void*)(KernelDescriptor->pSysMemory + (BlockID - nBlocks)*4096);
+                KeSysMemBitmapSet(BlockID - nBlocks, nBlocks);
+                return (void*)(keSysDescriptor->pSysMemory + (BlockID - nBlocks)*4096);
             }
         }
     }

@@ -5,7 +5,6 @@ namespace GUI
     void DrawLine(math::Vec2<UINT64> Pos1, math::Vec2<UINT64> Pos2, graphics::Color color)
     {
         using namespace math;
-        using namespace kernel;
         using namespace graphics;
 
         double Slope = (double)(Pos2.Y - Pos1.Y)/(double)(Pos2.X - Pos1.X);
@@ -13,7 +12,7 @@ namespace GUI
         for(auto vPixel = Pos1; vPixel.X < Pos2.X; vPixel.X++)
         {
             vPixel.Y = Slope*(double)(vPixel.X - Pos1.X) + Pos1.Y;
-            PutPixel(vPixel.X, vPixel.Y, &(KernelDescriptor->GOPInfo), color);
+            PutPixel(vPixel.X, vPixel.Y, &(keSysDescriptor->gopInfo), color);
         }
     }
 
@@ -21,18 +20,17 @@ namespace GUI
     {
         using namespace math;
         using namespace graphics;
-        using namespace kernel;
 
         for(Vec2<UINT64> Pos = Pos1; Pos.X < Pos2.X; Pos.X++)
         {
-            PutPixel(Pos.X, Pos1.Y, &(KernelDescriptor->GOPInfo), color);
-            PutPixel(Pos.X, Pos2.Y, &(KernelDescriptor->GOPInfo), color);
+            PutPixel(Pos.X, Pos1.Y, &(keSysDescriptor->gopInfo), color);
+            PutPixel(Pos.X, Pos2.Y, &(keSysDescriptor->gopInfo), color);
         }
 
         for(Vec2<UINT64> Pos = Pos1; Pos.Y < Pos2.Y; Pos.Y++)
         {
-            PutPixel(Pos1.X, Pos.Y, &(KernelDescriptor->GOPInfo), color);
-            PutPixel(Pos2.X, Pos.Y, &(KernelDescriptor->GOPInfo), color);
+            PutPixel(Pos1.X, Pos.Y, &(keSysDescriptor->gopInfo), color);
+            PutPixel(Pos2.X, Pos.Y, &(keSysDescriptor->gopInfo), color);
         }
     }
 
@@ -46,9 +44,9 @@ namespace GUI
         cout.pFramebufferInfo = new FRAMEBUFFER_INFO;
         cout.pFramebufferInfo->Height = Height;
         cout.pFramebufferInfo->Width = Width;
-        cout.pFramebufferInfo->Pitch = kernel::KernelDescriptor->GOPInfo.Pitch;
+        cout.pFramebufferInfo->Pitch = keSysDescriptor->gopInfo.Pitch;
         cout.pFramebufferInfo->pFrameBuffer = (
-                kernel::KernelDescriptor->GOPInfo.pFrameBuffer
+                keSysDescriptor->gopInfo.pFrameBuffer
                 + X*FRAMEBUFFER_BYTES_PER_PIXEL
                 + Y*cout.pFramebufferInfo->Pitch
                 );

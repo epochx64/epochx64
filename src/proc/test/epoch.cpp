@@ -1,27 +1,31 @@
 #include "epoch.h"
 
-extern "C" void __attribute__((sysv_abi)) _epochstart(KERNEL_DESCRIPTOR* kernelDescriptor);
+extern "C" void __attribute__((sysv_abi)) _epochstart(KE_SYS_DESCRIPTOR* kernelDescriptor);
 
-namespace kernel
+KE_SYS_DESCRIPTOR *keSysDescriptor;
+ext2::RAMDisk *keRamDisk;
+
+/* Kernel function list */
+KE_SCHEDULE_TASK KeScheduleTask;
+KE_GET_TIME KeGetTime;
+
+void KeInitAPI()
 {
-    KERNEL_DESCRIPTOR *KernelDescriptor;
-    ext2::RAMDisk *RAMDisk;
+    KeScheduleTask = keSysDescriptor->KeScheduleTask;
+    KeGetTime = keSysDescriptor->KeGetTime;
 }
 
-void _epochstart(KERNEL_DESCRIPTOR *kernelDescriptor)
+void _epochstart(KE_SYS_DESCRIPTOR *kernelDescriptor)
 {
-    KernelDescriptor = kernelDescriptor;
-    log::kout.pFramebufferInfo = &(kernelDescriptor->GOPInfo);
-
-    Schedulers = (scheduler::Scheduler**)KernelDescriptor->pSchedulers;
-    TASK_INFOS = (scheduler::TASK_INFO**)KernelDescriptor->pTaskInfos;
-
-    kernel::RAMDisk = (ext2::RAMDisk*)KernelDescriptor->pRAMDisk;
+    keSysDescriptor = kernelDescriptor;
+    log::kout.pFramebufferInfo = &(kernelDescriptor->gopInfo);
+    keRamDisk = (ext2::RAMDisk*)keSysDescriptor->pRAMDisk;
 
     heap::init();
+    KeInitAPI();
 
     main();
 
-    while (true);
+    while (true) asm volatile("hlt");
 
 }

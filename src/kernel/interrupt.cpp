@@ -2,16 +2,18 @@
 
 extern "C" UINT64 IDT64_PTR;
 
-//  TODO:   Add comments, fix spaghetti
+/*
+ * TODO: Add comments, fix spaghetti
+ */
 namespace interrupt
 {
     using namespace log;
-    using namespace scheduler;
     /*--------------------------------------
      *            Exceptions
+     *  TODO: Setup proper exception handling
      ---------------------------------------*/
-    extern "C" TASK_INFO ERR_INFO;
-    TASK_INFO ERR_INFO;
+    extern "C" KE_TASK_DESCRIPTOR ERR_INFO;
+    KE_TASK_DESCRIPTOR ERR_INFO;
 
     void GenericExceptionHandler(UINT64 ErrorCode, UINT64 RIP, UINT64 CS, UINT64 RFLAGS)
     {
@@ -22,7 +24,7 @@ namespace interrupt
         << "CS:EIP: 0x" << (UINT8)CS << ":" << RIP << "\n"
         << "EFLAGS: 0x" << RFLAGS << "\n";
 
-        while(true);
+        hlt();
     }
 
     /*--------------------------------------
@@ -33,47 +35,55 @@ namespace interrupt
     {
         kout << "IRQ49: Test interrupt\n";
 
-        ASMx64::outb(0xA0, 0x20);
-        ASMx64::outb(0x20, 0x20);   //  End of interrupt
+        outb(0xA0, 0x20);
+        outb(0x20, 0x20);   //  End of interrupt
     }
 
     //  One tick is one call to the timer ISR
-    double msPerTick;
-    double ms = 0.0;
+    double nsPerTick;
+    UINT64 Ticks = 1;
 
     //  Old tick from PIT
     void ISR32TimerHandler()
     {
-        log::TTY_COORD OldCOORD = kout.GetPosition();
+        TTY_COORD oldCOORD = kout.GetPosition();
 
-        log::TTY_COORD TimerCOORD;
-        TimerCOORD.Lin = 0;
-        TimerCOORD.Col = 70;
-        kout.SetPosition(TimerCOORD);
+        TTY_COORD timerCOORD;
+        timerCOORD.Lin = 0;
+        timerCOORD.Col = 70;
+        kout.SetPosition(timerCOORD);
 
-        kout << DEC << (UINT64)ms << " ms\n";
-        kout.SetPosition(OldCOORD);
+        kout << DEC << (UINT64)(nsPerTick*(double)Ticks/1e6) << " ms\n";
+        kout.SetPosition(oldCOORD);
 
-        ms = ms + msPerTick;
+        Ticks++;
 
-        ASMx64::outb(0x20, 0x20);   //  End of interrupt
+        
+
+        outb(0x20, 0x20);   //  End of interrupt
     }
 
     void ISR48APICTimerHandler(UINT64 RIP, UINT64 CS, UINT64 RFLAGS, UINT64 RSP)
     {
-        Schedulers[ASMx64::APICID()]->Tick();
+        keSchedulers[APICID()]->Tick();
 
         //  Signal End of Interrupt
-        ACPI::SetLAPICRegister<UINT32>(kernel::KernelDescriptor->APICBase, 0x0B0, 0x00);
+        SetLAPICRegister<UINT32>(keSysDescriptor->apicBase, 0x0B0, 0x00);
     }
 
     void ISR33KeyboardHandler()
     {
-        using namespace ASMx64;
+        
 
-        while(!(inb(0x64) & 1));
+        /*
+         * TODO: Typing on keyboard and using mouse simultaneously will sometimes
+         *       cause generated keyboard/mouse IRQs to get handled by the wrong respective ISR
+         *       Appears to only happen in QEMU
+         *
+         *       TODO: Implement a proper keyboard driver
+         */
+
         UINT8 Scancode = inb(0x60);
-
         kout << HEX << Scancode << " ";
 
         outb(0x20, 0x20);   //  End of interrupt
@@ -87,9 +97,6 @@ namespace interrupt
 
     void ISR44MouseHandler()
     {
-        using namespace ASMx64;
-
-        static UINT8 mousePacketSize = 3 + (UINT8)((bool)MouseID);
         static UINT8 mouseCycle{0};
         static int x{420}, y{420};
         static UINT8 mouseData[3];
@@ -97,13 +104,11 @@ namespace interrupt
         /*
          * Wait for PS/2 mouse data
          */
-        while(!(inb(0x64) & 1));
         UINT8 Scancode = inb(0x60);
 
         /*
          * Mouse sends 3 separate interrupts per mouse event
          */
-
         mouseData[mouseCycle] = Scancode;
 
         if(mouseCycle == 2)
@@ -112,9 +117,13 @@ namespace interrupt
             y = y - ((int)mouseData[2] - (int)(((UINT16)mouseData[0] << 3) & 0x0100));
         }
 
-        mouseCycle = (mouseCycle + 1) % mousePacketSize;
+        mouseCycle = (mouseCycle + 1) % MousePacketSize;
 
-        graphics::PutPixel(x, y, &(kernel::KernelDescriptor->GOPInfo), COLOR_WHITE);
+        /*
+         * TODO: Future mouse handling code belongs elsewhere since the interrupt cannot take a huge amount of time
+         *       to execute (schedule a task here instead of doing the work here)
+         */
+        graphics::PutPixel(x, y, &(keSysDescriptor->gopInfo), COLOR_WHITE);
 
         outb(0xA0, 0x20);   //  EOI for the slave PIC
         outb(0x20, 0x20);   //  End of interrupt
@@ -140,13 +149,13 @@ namespace interrupt
         );
     }
 
-    void FillIDT64()
+    void KeInitIDT()
     {
-        ASMx64::cli();
+        cli();
 
         //  UEFI makes its own GDT that we don't want, so this contains
         //  More than just a lgdt instruction
-        ASMx64::lgdt();
+        lgdt();
 
         //  Might make individual exception ISRs later
         void (*ISR_list[])() = {
@@ -171,6 +180,6 @@ namespace interrupt
         SetIDTGate(48, &ISR48);     //  APIC Timer
         SetIDTGate(49, &ISR49);     //  Test Interrupt
 
-        ASMx64::lidt();
+        lidt();
     }
 }

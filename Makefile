@@ -1,7 +1,7 @@
 NAME = epochx64
 
 # For compiling the kernel
-INCLUDES=-Isrc -Isrc/lib
+INCLUDES=-Isrc/include -Isrc/kernel/include
 SRC_LOC=./src
 
 CXX = x86_64-elf-g++.exe
@@ -18,10 +18,10 @@ NASMFLAGS = -felf64
 EFI_C = x86_64-w64-mingw32-gcc.exe
 EFI_CFLAGS = -ffreestanding
 EFI_LINKFLAGS = -nostdlib -Wl,-dll -shared -Wl,--subsystem,10 -e efi_main  -lgcc
-EFI_INCLUDES = -Isrc/lib -Isrc -Isrc/lib/uefi/Include -Isrc/lib/uefi/Include/X64 -Isrc/lib/elf -Isrc/lib/uefi/Include/Protocol
+EFI_INCLUDES = -Isrc/include -Isrc/include/uefi -Isrc/include/uefi/X64 -Isrc/include/elf -Isrc/include/uefi/Protocol
 
 KERNEL_TARGETS = kernel log interrupt acpi pic graphics scheduler process gui/window
-LIB_TARGETS = string mem math/math elf/relocation ../fs/ext2
+LIB_TARGETS = epstring mem math/math elf/relocation ../fs/ext2
 ASM_TARGETS = lib/asm/asm kernel/interrupt
 
 #TODO:	So far this will only work with one target
@@ -39,12 +39,12 @@ efi:
 # Kernel components
 $(KERNEL_TARGETS):
 	@$(CXX) -c $(SRC_LOC)/kernel/$@.cpp $(CFLAGS) $(INCLUDES) -o ./obj/$(lastword $(subst /, ,$@)).obj
-	@echo "CXX $@.cpp"
+	@echo "CPP $@.cpp"
 
 # Lib components
 $(LIB_TARGETS):
 	@$(CXX) -c $(SRC_LOC)/lib/$@.cpp $(CFLAGS) $(INCLUDES) -o ./obj/$(lastword $(subst /, ,$@)).obj
-	@echo "CXX $@.cpp"
+	@echo "CPP $@.cpp"
 
 $(ASM_TARGETS):
 	@$(NASM) $(NASMFLAGS) $(SRC_LOC)/$@.s -o ./obj/$(lastword $(subst /, ,$@))_s.obj

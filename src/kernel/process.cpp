@@ -1,30 +1,19 @@
 #include "process.h"
 
-namespace kernel
-{
-    extern KERNEL_DESCRIPTOR *KernelDescriptor;
-    extern ext2::RAMDisk *RAMDisk;
-}
+extern KE_SYS_DESCRIPTOR *keSysDescriptor;
+extern ext2::RAMDisk *keRamDisk;
 
 Process::Process(const char *binaryPath)
 {
-    using namespace kernel;
+    ext2::File file(keRamDisk, FILETYPE_REG, binaryPath);
 
-    ext2::File file(RAMDisk, FILETYPE_REG, binaryPath);
+    auto fileBuf = KeSysMalloc(file.Size());
+    keRamDisk->ReadFile(file.Data(), (UINT8*)fileBuf);
 
-    auto fileBuf = SysMalloc(file.Size());
-    RAMDisk->ReadFile(file.Data(), (UINT8*)fileBuf);
+    auto entry = (void (*)(KE_SYS_DESCRIPTOR*))elf::LoadELF64((Elf64_Ehdr*)fileBuf);
 
-    auto Entry = (void (*)(KERNEL_DESCRIPTOR*))elf::LoadELF64((Elf64_Ehdr*)fileBuf);
-
-    /*
-     * Cannot use new operator here, must use SysMalloc so that t persists
-     * after it's creating process terminates
-     */
-    Task *t = (Task*)SysMalloc(sizeof(Task));
-    t->Constructor((UINT64)Entry, true, (TASK_ARG*)KernelDescriptor);
-
-    scheduler::Scheduler::ScheduleTask(t);
+    Task *t = new Task((UINT64)entry, 0, false, 0, (KE_TASK_ARG*)keSysDescriptor);
+    Scheduler::ScheduleTask(t);
 }
 
 Process::~Process() { }

@@ -42,7 +42,7 @@
 ;                           IRQ handlers                   |
 ; ----------------------------------------------------------
 
-    ;   ERR_INFO is pointer to TASK_INFO struct
+    ;   ERR_INFO is pointer to KE_TASK_DESCRIPTOR struct
     extern ERR_INFO
     extern GenericExceptionHandler
     global GenericException
@@ -88,23 +88,15 @@ ISR49:
     popaq
     iretq
 
-    segment .data
-    align 16
-FXSAVE: times 512 db 0
-
-    segment .code
     extern ISR32TimerHandler
     global ISR32
 ISR32:
     ;   Timer interrupt handler uses floating point
     fxsave [FXSAVE]
-
     pushaq
     call ISR32TimerHandler
     popaq
-
     fxrstor [FXSAVE]
-
     iretq
 
     extern ISR33KeyboardHandler
@@ -131,7 +123,7 @@ ISR255:
 
     global ISR48
 ISR48:
-    extern TASK_INFOS
+    extern keTasks
     extern ISR48APICTimerHandler
     extern APICID
 
@@ -142,15 +134,15 @@ ISR48:
     mov rbx, rax
     imul rbx, 8
 
-    ; CTaskInfos is an array of pointers to TASK_INFO structs, one for every logical processor
-    mov rax, [TASK_INFOS]
+    ; CTaskInfos is an array of pointers to KE_TASK_DESCRIPTOR structs, one for every logical processor
+    mov rax, [keTasks]
 
     add rax, rbx
     mov rax, [rax]
 
     pop rbx
 
-    ;   rax is now a pointer to a TASK_INFO struct
+    ;   rax is now a pointer to a KE_TASK_DESCRIPTOR struct
 
     ;   Save all the registers
     fxsave [rax + 0]
@@ -175,7 +167,7 @@ ISR48:
     mov [rbx + 632], rax
 
     ;   Save the IRETQ stack parameters
-    ;   CurrentTaskInfo changes after this function
+    ;   currentTaskInfo changes after this function
     mov rdi, [rsp + 0]      ;   RIP
     mov rsi, [rsp + 8]      ;   CS
     mov rdx, [rsp + 16]     ;   RFLAGS
@@ -192,7 +184,7 @@ ISR48:
     call APICID
     mov rbx, rax
 
-    mov rax, [TASK_INFOS]
+    mov rax, [keTasks]
 
     imul rbx, 8
     add rax, rbx
@@ -271,3 +263,7 @@ done:
     mov ss, ax
 
     ret
+
+    section .data
+    align 16
+FXSAVE: times 512 db 0
