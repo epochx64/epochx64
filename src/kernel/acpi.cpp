@@ -81,13 +81,15 @@ void KeInitAPIC()
             MSRValue |= (1<<10);
             SetMSR(0x01B, MSRValue);
 
-            kout << "x2APIC\n";
+            //kout << "x2APIC\n";
+            printf("[ CPU ] x2APIC\n");
         }
         else
         {
             keSysDescriptor->apicBase = MSRValue & 0x0000000FFFFFF000;
 
-            kout << "xAPIC\n";
+            //kout << "xAPIC\n";
+            printf("[ CPU ] xAPIC\n");
         }
 
         //  Set the spurious interrupt vector register to vector 39
@@ -111,7 +113,7 @@ void KeInitAPIC()
         SetLAPICRegister(keSysDescriptor->apicBase, 0x320, APICTimerReg);
 
         //  Set Initial Count Register
-        keSysDescriptor->apicInitCount = 0x0010000;
+        keSysDescriptor->apicInitCount = 0x00150000;
         SetLAPICRegister(keSysDescriptor->apicBase, 0x380, keSysDescriptor->apicInitCount);
     }
 
@@ -129,7 +131,8 @@ void KeInitAPIC()
 
         UINT64 hpetPeriod  = *(UINT64*)(hpetAddress) >> 32;
         keSysDescriptor->hpetPeriod = hpetPeriod;
-        kout << "[ HPET ] period in femptoseconds: " << DEC << hpetPeriod << "\n";
+        //kout << "[ HPET ] period in femptoseconds: " << DEC << hpetPeriod << "\n";
+        printf("[ HPET ] period in femptoseconds: %u\n", hpetPeriod);
 
         //  Enable HPET
         *(UINT64*)(hpetAddress + 0x10) |= 1;
@@ -137,10 +140,12 @@ void KeInitAPIC()
         UINT64 configHPET = *(UINT64*)(hpetAddress + 0x100);
         if(configHPET & (1<<4))
         {
-            kout << "[ HPET ] Periodic mode supported\n";
+            //kout << "[ HPET ] Periodic mode supported\n";
+            printf("[ HPET ] Periodic mode supported\n");
 
             if(configHPET & (1<<1))
-                kout << "[ HPET ] Level triggered\n";
+                printf("[ HPET ] Level triggered\\n");
+                //kout << "[ HPET ] Level triggered\n";
 
             //  Enable periodic mode
             configHPET |= (1<<3) | (1<<6) & ~(1<<2);
@@ -185,7 +190,8 @@ void KeInitAPIC()
             if(Size == 0) break;
             Iterator += Size;
         }
-        kout << DEC << "Found " << nCores << " logical processors\n";
+        //kout << DEC << "Found " << nCores << " logical processors\n";
+        printf("[ CPU ] Found %u logical processors\n", nCores);
         keSysDescriptor->nCores = nCores;
 
         /*
@@ -200,19 +206,7 @@ void KeInitAPIC()
 
         for(UINT64 i = 0; i < nCores; i++)
         {
-            auto t = new Task(
-                    (UINT64)&gfxroutine,
-                    0,
-                    false,
-                    0,
-                    new KE_TASK_ARG[3] {
-                            (KE_TASK_ARG)(new double(550.0 + 42.0*i)),
-                            (KE_TASK_ARG)(new double(40.0)),
-                            (KE_TASK_ARG)(new int(16))
-                    });
-
             keSchedulers[i] = (Scheduler*)(new Scheduler(i));
-            keSchedulers[i]->AddTask(t);
         }
 
         pAPBootstrapInfo = new KE_AP_BOOTSTRAP_INFO[nCores];

@@ -1,23 +1,17 @@
 #include "kernel.h"
 
-/*
- * TODO: This ENTIRE project need to turn PascalCase to camelCase
- * TODO: TOO MANY NAMESPACES
- * TODO: IMPROVE ALGORITHMS (nothing specific just look for unoptimized code)
- */
-
 /**********************************************************************
  *  Global variables
  *********************************************************************/
-
-ext2::RAMDisk *keRamDisk;
 KE_SYS_DESCRIPTOR *keSysDescriptor;
-UINT8 __attribute__((aligned(16))) keInitStack[8192];
 
 /**********************************************************************
  *  Local variables
  *********************************************************************/
 
+static ext2::RAMDisk *keRamDisk;
+
+static UINT8 __attribute__((aligned(16))) keInitStack[8192];
 static UINT8 __attribute__((aligned(16))) keInitFXSave[512];
 
 /**********************************************************************
@@ -44,15 +38,19 @@ void heapPrint()
  *********************************************************************/
 void KeMain(KE_SYS_DESCRIPTOR *kernelInfo)
 {
+    /* Enable SIMD instructions */
+    EnableSSE(keInitFXSave);
+
     /* Initialize heap (malloc, free, etc.) */
     heap::init();
-
-    /* Change the stack pointer */
-    SetRSP((UINT64)keInitStack + 8192);
 
     /* Populate keSysDescriptor struct */
     keSysDescriptor = new KE_SYS_DESCRIPTOR;
     *keSysDescriptor = *kernelInfo;
+
+    /* Create an stdout object */
+    auto keStdout = createStdout();
+    setStdout(keStdout);
 
     /* Set kout framebuffer pointer */
     log::kout.pFramebufferInfo = &(keSysDescriptor->gopInfo);
@@ -66,28 +64,42 @@ void KeMain(KE_SYS_DESCRIPTOR *kernelInfo)
     /* Set the blocks which store the SysMemory bitmap as occupied */
     KeSysMemBitmapSet(0, keSysDescriptor->sysMemoryBitMapSize/BLOCK_SIZE + 1);
 
-    double sysMemSize = (double)keSysDescriptor->sysMemorySize / 0x40000000;
-    log::kout << "Free SysMemory: "<<DOUBLE_DEC << sysMemSize << "GiB\n";
-
     /*
      * Setup IDT, PS/2 devices, PIT, and APIC timer
      * Interrupts enabled after here
      */
-    EnableSSE(keInitFXSave);
+    KeInitAPI();
     interrupt::KeInitIDT();
     KeInitPS2();
     KeInitPIC();
-    KeInitAPI();
     KeInitACPI();
 
     //CalibrateAPIC(1e4);
 
-    /* Initialize RAM disk */
-    keRamDisk = new ext2::RAMDisk(keSysDescriptor->pRAMDisk, INITRD_SIZE_BYTES, false);;
+    double sysMemSize = (double)keSysDescriptor->sysMemorySize / 0x40000000;
+    //log::kout << "Free SysMemory: "<<DOUBLE_DEC << sysMemSize << "GiB\n";
+    printf("[ MEM ] Free system memory: %f GiB\n", sysMemSize);
+    printf("HELLO 0x%04x\n", 0x4333);
 
-    /* Spawn a process (will change) */
-    Process p1("/boot/test.elf");
-    Process p2("/boot/dwm.elf");
+    /* Initialize RAM disk */
+    keRamDisk = new ext2::RAMDisk(keSysDescriptor->pRAMDisk, INITRD_SIZE_BYTES, false);
+
+    PROCESS_PROPERTIES properties;
+    properties.pStdout = keStdout;
+
+    /* Spawn DWM process */
+    properties.path = "/boot/dwm.elf";
+    properties.startTime = KeGetTime();
+    properties.reschedule = false;
+    properties.periodNanoSeconds = 0;
+    properties.noWindow = true;
+    KeCreateProcess(&properties);
+
+    /* Spawn test process */
+    properties.path = "/boot/test.elf";
+    properties.startTime = KeGetTime() + 0.5e9;
+    properties.noWindow = false;
+    KeCreateProcess(&properties);
 
     /* Start interrupts and make the CPU idle (this is now the idle task for scheduler 0) */
     sti();
@@ -100,7 +112,9 @@ void KeMain(KE_SYS_DESCRIPTOR *kernelInfo)
  *********************************************************************/
 void KeInitAPI()
 {
+    keSysDescriptor->KeCreateProcess = &KeCreateProcess;
     keSysDescriptor->KeScheduleTask = &KeScheduleTask;
+    keSysDescriptor->KeSuspendCurrentTask = &KeSuspendCurrentTask;
     keSysDescriptor->KeGetTime = &KeGetTime;
 }
 
@@ -113,11 +127,74 @@ void KeInitAPI()
  *  @param args - Array of pointers to arguments
  *  @return None
  *********************************************************************/
-KE_HANDLE KeScheduleTask(UINT64 entry, KE_TIME startTime, UINT8 reschedule, KE_TIME periodNanoSeconds, KE_TASK_ARG* args)
+KE_HANDLE KeScheduleTask(UINT64 entry, KE_TIME startTime, UINT8 reschedule, KE_TIME periodNanoSeconds, UINT64 nArgs, ...)
 {
-    Task *task = new Task(entry, startTime, reschedule, periodNanoSeconds, args);
+    va_list argList;
+
+    va_start(argList, nArgs);
+    Task *task = new Task(entry, startTime, reschedule, periodNanoSeconds, nArgs, argList);
+    va_end(argList);
+
     Scheduler::ScheduleTask(task);
     return task->ID;
+}
+
+/**********************************************************************
+ *  @details Kernel API function to spawn a process from the RAM disk
+ *           Eventually will support spawning from persistent storage
+ *  @param properties - Pointer to PROCESS_PROPERTIES struct
+ *  @param path - RAM disk path to executable elf
+ *  @param startTime - KE_TIME when the task should start
+ *  @param reschedule - Whether to reschedule the task once it completes
+ *  @param periodMicroSeconds - Period of consecutive executions of the task
+ *  @param stdout - Pointer to stdout struct or nullptr
+ *  @param noWindow - If stdout is nullptr, a console window is made, use this to override
+ *                    and don't spawn a window
+ *  @return None
+ *********************************************************************/
+KE_HANDLE KeCreateProcess(PROCESS_PROPERTIES *properties)
+{
+    ext2::File file(keRamDisk, FILETYPE_REG, properties->path);
+
+    auto fileBuf = KeSysMalloc(file.Size());
+    keRamDisk->ReadFile(file.Data(), (UINT8*)fileBuf);
+
+    auto entry = (void (*)(KE_SYS_DESCRIPTOR*))elf::LoadELF64((Elf64_Ehdr*)fileBuf);
+
+    KeScheduleTask((UINT64)entry,
+            properties->startTime,
+            properties->reschedule,
+            properties->periodNanoSeconds,
+            3,
+            keSysDescriptor,
+            properties->pStdout,
+            properties->noWindow
+            );
+
+    return 0;
+}
+
+/**********************************************************************
+ *  @details Stops executing the current thread until unsuspend
+ *********************************************************************/
+void KeSuspendCurrentTask()
+{
+    UINT64 coreID = APICID();
+    auto scheduler = keSchedulers[coreID];
+    auto currentTask = scheduler->currentTask;
+
+    /* Lock the scheduler to prevent it from accessing the structure we're about to edit */
+    scheduler->isLocked = true;
+
+    /* Signal to the scheduler that the task is completed */
+    currentTask->ended = true;
+    currentTask->suspended = true;
+
+    /* Unlock the scheduler */
+    scheduler->isLocked = false;
+
+    /* Wait for the scheduler tick */
+    hlt();
 }
 
 /**********************************************************************

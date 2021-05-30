@@ -11,24 +11,24 @@ INCLUDES=-I ../../include -I../../kernel/include -I../include
 SRC_LOC=../..
 
 KERNEL_TARGETS = log graphics
-LIB_TARGETS = mem math/math elf/relocation ../fs/ext2
+LIB_TARGETS = mem math/math elf/relocation ../fs/ext2 io
 
 all: $(KERNEL_TARGETS) $(LIB_TARGETS) ../epoch $(NAME) link
 
 # Kernel components
 $(KERNEL_TARGETS):
 	@$(CXX) -c $(SRC_LOC)/kernel/$@.cpp $(CFLAGS) $(INCLUDES) -o ./obj/$(lastword $(subst /, ,$@)).obj
-	@echo "CPP $@.cpp"
+	@echo "CXX $@.cpp"
 
 # Lib components
 $(LIB_TARGETS):
 	@$(CXX) -c $(SRC_LOC)/lib/$@.cpp $(CFLAGS) $(INCLUDES) -o ./obj/$(lastword $(subst /, ,$@)).obj
-	@echo "CPP $@.cpp"
+	@echo "CXX $@.cpp"
 
 # Epoch components
 ../epoch $(NAME):
 	@$(CXX) -c ./$@.cpp $(CFLAGS) $(INCLUDES) -o ./obj/$(lastword $(subst /, ,$@)).obj
-	@echo "CPP $@.cpp"
+	@echo "CXX $@.cpp"
 
 # Final link command
 link:

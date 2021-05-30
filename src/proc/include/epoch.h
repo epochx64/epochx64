@@ -4,16 +4,17 @@
 #include <log.h>
 #include <asm/asm.h>
 #include <fs/ext2.h>
-
-extern __attribute__((sysv_abi)) int main();
+#include <io.h>
+#include <window_common.h>
 
 extern KE_SYS_DESCRIPTOR *keSysDescriptor;
-extern ext2::RAMDisk *keRamDisk;
 
 /*
  * Start of kernel function list
  */
+extern KE_CREATE_PROCESS KeCreateProcess;
 extern KE_SCHEDULE_TASK KeScheduleTask;
+extern KE_SUSPEND_CURRENT_TASK KeSuspendCurrentTask;
 extern KE_GET_TIME KeGetTime;
 
 #endif

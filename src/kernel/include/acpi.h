@@ -8,8 +8,7 @@
 #include <mem.h>
 #include <typedef.h>
 #include <scheduler.h>
-
-
+#include <io.h>
 
 extern bool x2APIC;
 extern "C" KE_AP_BOOTSTRAP_INFO *pAPBootstrapInfo;

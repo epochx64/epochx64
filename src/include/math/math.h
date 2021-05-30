@@ -19,7 +19,7 @@ namespace math
         T Y;
     };
 
-#define PI 3.14159265357
+#define PI (double)3.14159265357
     /***
      * Only use floats or doubles
      * @tparam T

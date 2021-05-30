@@ -105,7 +105,7 @@ void KeInitPS2()
         MouseID = KePS2Read();
 
         MousePacketSize = 3 + (UINT8)((bool)MouseID);
-        kout << "[ PS/2 ]: Mouse ID = 0x" <<HEX<< MouseID << "\n";
+        //kout << "[ PS/2 ]: Mouse ID = 0x" <<HEX<< MouseID << "\n";
     }
 
     //  Enable Keyboard

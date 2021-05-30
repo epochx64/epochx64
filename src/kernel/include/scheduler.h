@@ -10,6 +10,7 @@
 #include <mem.h>
 #include <log.h>
 #include <asm/asm.h>
+#include <stdarg.h>
 
 /**********************************************************************
  *  Define macros
@@ -25,11 +26,14 @@ class Task
 public:
     UINT64 pEntryPoint; /* Pointer to entry point */
     UINT64 pStack;      /* Pointer to the top of the stack */
-    KE_TASK_ARG* args;  /* Array of pointers to function arguments */
+
+    UINT64 nArgs;       /* Number of arguments passed to the entrypoint */
+    UINT64 args[6];     /* Array of argument values (pointer or integer) */
 
     bool reschedule;            /* Whether the task repeatedly runs */
     KE_TIME periodNanoSeconds;  /* Period of consecutive task runs */
 
+    bool suspended;
     bool sleeping;      /* True if task is sleeping */
     bool ended;         /* True if the task has finished */
     KE_TIME startTime;  /* Kernel time that the task must start by */
@@ -46,9 +50,10 @@ public:
      *  @param startTime - Kernel time when the task should begin
      *  @param reschedule - True if you want the task to repeatedly run
      *  @param periodNanoSeconds - Period of the task in nanoseconds
-     *  @param taskArgs - Array of pointers to task arguments
+     *  @param nArgs - Number of arguments to the entry point
+     *  @param ... - The arguments. Must be integer or pointer type only
      *********************************************************************/
-    Task(UINT64 entry, KE_TIME startTime, bool reschedule, KE_TIME periodNanoSeconds, KE_TASK_ARG* taskArgs);
+    Task(UINT64 entry, KE_TIME startTime, bool reschedule, KE_TIME periodNanoSeconds, UINT64 nArgs, va_list args);
 
     /**********************************************************************
      *  @details Task destructor

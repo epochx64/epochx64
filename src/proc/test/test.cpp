@@ -31,21 +31,15 @@ void gfxroutine(KE_TASK_ARG *TaskArgs)
 
 void testMsg()
 {
-    log::kout << "TEST\n";
+    static UINT8 i = 0;
+    printf("TEST %u\n", i++);
 }
 
 int main()
 {
-    log::kout << "HELLO WORLDD FROM test.elf    \n";
+    printf("HELLO WORLD FROM TEST.elf\n");
 
-    KeScheduleTask((UINT64)&testMsg, KeGetTime(), true, 1e9, 0);
+    //KeScheduleTask((UINT64)&testMsg, KeGetTime(), true, 0.5e9, 0);
 
-    KeScheduleTask((UINT64)&gfxroutine, 0, false, 0,
-            new KE_TASK_ARG[3] {
-            (KE_TASK_ARG)(new double(600.0 + 42.0)),
-            (KE_TASK_ARG)(new double(140.0)),
-            (KE_TASK_ARG)(new int(16))
-    });
-
-    return 0;
+    //KeSuspendCurrentTask();
 }

@@ -27,7 +27,9 @@ Scheduler::Scheduler(UINT64 core)
     nTasks = 1;
 
     /* Initialize idle task */
-    currentTask = new Task(0, 0, false, 0, nullptr);
+    va_list args{};
+    currentTask = new Task(0, 0, false, 0, 0, args);
+
     currentTask->ID = 0;
     idleTask = currentTask;
     schedule.heap[0] = idleTask;
@@ -65,6 +67,7 @@ void Scheduler::AddTask(Task *t)
  *********************************************************************/
 void Scheduler::RemoveCurrentTask()
 {
+    //TODO: Make this less ugly with helper functions
     nTasks--;
 
     /* Traverse the linked list to get the previous element before currentTask */
@@ -94,41 +97,49 @@ void Scheduler::RemoveCurrentTask()
         activeTaskList = idleTask;
     }
 
-    /* If the current task is meant to repeat */
-    if(currentTask->reschedule)
+    /* If the task has been suspended */
+    if (currentTask->suspended)
     {
-        /* Reset member variables of the current task */
-        currentTask->ended = false;
+        currentTask = activeTaskList;
+        return;
+    }
 
-        /* If the task took longer to execute than its period */
-        if(currentTime > currentTask->startTime + currentTask->periodNanoSeconds)
-        {
-            /* Reschedule immediately */
-            currentTask->startTime = currentTime;
-        }
-        else
-        {
-            /* Reschedule after one period has elapsed since previous call */
-            currentTask->startTime += currentTask->periodNanoSeconds;
-        }
+    /* If the current task is not meant to repeat */
+    if(!currentTask->reschedule)
+    {
+        currentTask = activeTaskList;
+        /* TODO: Add a destructor for tasks */
+        delete currentTask;
 
-        /* Reset registers of the current task */
-        *(UINT64*)currentTask->pStack = (UINT64)&ReturnFrame;
-        currentTask->pTaskInfo->rsp = currentTask->pStack;
-        currentTask->pTaskInfo->rbp = currentTask->pStack;
-        currentTask->pTaskInfo->rdi = (UINT64)currentTask->args;
-        currentTask->pTaskInfo->IRETQCS = 0x08;
-        currentTask->pTaskInfo->IRETQRFLAGS = 0x202;
-        currentTask->pTaskInfo->IRETQRIP = currentTask->pEntryPoint;
+        return;
+    }
 
-        /* Reschedule the task */
-        AddTask(currentTask);
+    /* Reset member variables of the current task */
+    currentTask->ended = false;
+
+    /* If the task took longer to execute than its period */
+    if(currentTime > currentTask->startTime + currentTask->periodNanoSeconds)
+    {
+        /* Reschedule immediately */
+        currentTask->startTime = currentTime;
     }
     else
     {
-        /* TODO: Add a destructor for tasks */
-        delete currentTask;
+        /* Reschedule after one period has elapsed since previous call */
+        currentTask->startTime += currentTask->periodNanoSeconds;
     }
+
+    /* Reset registers of the current task */
+    *(UINT64*)currentTask->pStack = (UINT64)&ReturnFrame;
+    currentTask->pTaskInfo->rsp = currentTask->pStack;
+    currentTask->pTaskInfo->rbp = currentTask->pStack;
+    currentTask->pTaskInfo->rdi = (UINT64)currentTask->args;
+    currentTask->pTaskInfo->IRETQCS = 0x08;
+    currentTask->pTaskInfo->IRETQRFLAGS = 0x202;
+    currentTask->pTaskInfo->IRETQRIP = currentTask->pEntryPoint;
+
+    /* Reschedule the task */
+    AddTask(currentTask);
 
     currentTask = activeTaskList;
 }
@@ -197,8 +208,6 @@ void ReturnFrame()
     auto scheduler = keSchedulers[coreID];
     auto currentTask = scheduler->currentTask;
 
-    //log::kout << "I HAVE RETURNED!\n";
-
     /* Lock the scheduler to prevent it from accessing the structure we're about to edit */
     scheduler->isLocked = true;
 
@@ -218,18 +227,19 @@ void ReturnFrame()
  *  @param startTime - Kernel time when the task should begin
  *  @param reschedule - True if you want the task to repeatedly run
  *  @param periodNanoSeconds - Period of the task in nanoseconds
- *  @param taskArgs - Array of pointers to task arguments
+ *  @param nArgs - Number of arguments to the entry point. Maximum of 6.
+ *  @param ... - The arguments. Must be integer or pointer type only
  *********************************************************************/
-Task::Task(UINT64 entry, KE_TIME startTime, bool reschedule, KE_TIME periodNanoSeconds, KE_TASK_ARG* taskArgs)
+Task::Task(UINT64 entry, KE_TIME startTime, bool reschedule, KE_TIME periodNanoSeconds, UINT64 nArgs, va_list args)
 {
     /* Initialize member variables */
     this->reschedule = reschedule;
     this->startTime = startTime;
     this->periodNanoSeconds = periodNanoSeconds;
-    this->args = taskArgs;
     this->nextActiveTask = nullptr;
     this->pEntryPoint = entry;
     this->ended = false;
+    this->suspended = false;
 
     this->pTaskInfo   = (KE_TASK_DESCRIPTOR*)KeSysMalloc(sizeof(KE_TASK_DESCRIPTOR));
     this->pStack      = (UINT64)KeSysMalloc(STACK_SIZE + 1) + STACK_SIZE;
@@ -238,11 +248,26 @@ Task::Task(UINT64 entry, KE_TIME startTime, bool reschedule, KE_TIME periodNanoS
     for(UINT64 i = 0; i < sizeof(KE_TASK_DESCRIPTOR); i+=8)
         *(UINT64*)((UINT64)pTaskInfo + i) = 0;
 
-    /* Set registers */
+    /* SYS-V ABI argument arrangement */
+    UINT64 *taskArguments[6] = {
+            &pTaskInfo->rdi,
+            &pTaskInfo->rsi,
+            &pTaskInfo->rdx,
+            &pTaskInfo->rcx,
+            &pTaskInfo->r8,
+            &pTaskInfo->r9,
+    };
+
+    /* Set argument registers (SYS-V ABI calling convention) */
+    for (UINT64 i = 0; i < nArgs; i++)
+    {
+        *taskArguments[i] = va_arg(args, UINT64);
+    }
+
+    /* Set other registers */
     *(UINT64*)pStack = (UINT64)&ReturnFrame;
     pTaskInfo->rsp = pStack;
     pTaskInfo->rbp = pStack;
-    pTaskInfo->rdi = (UINT64)taskArgs;
     pTaskInfo->IRETQCS = 0x08;
     pTaskInfo->IRETQRFLAGS = 0x202;
     pTaskInfo->IRETQRIP = entry;

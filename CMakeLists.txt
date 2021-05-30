@@ -26,20 +26,16 @@ add_executable(epochx64 src/boot/boot.c
         src/kernel/include/scheduler.h
         src/lib/linkedlist.cpp
         src/include/linkedlist.h
-        src/kernel/gui/window.cpp
-        src/kernel/include/window.h
         src/fs/ext2.cpp
         src/include/fs/ext2.h
         src/lib/elf/relocation.cpp
         src/include/elf/relocation.h
-        src/proc/test/epoch.h
-        src/proc/test/epoch.cpp
-        src/kernel/process.cpp
-        src/kernel/include/process.h
-        src/kernel/keyboard.cpp
-        src/kernel/include/keyboard.h
+        src/proc/include/epoch.h
+        src/proc/epoch.cpp
         src/kernel/pic.cpp
         src/kernel/include/pic.h
-        )
+        src/include/window_common.h
+        src/lib/io.cpp
+        src/include/ps2.h)
 
 target_include_directories(epochx64 PUBLIC src src/include src/kernel/include src/include/elf src/include/uefi src/include/uefi/X64 src/include/uefi/Protocol)

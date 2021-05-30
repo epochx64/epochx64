@@ -70,11 +70,26 @@ typedef struct
 typedef UINT64 KE_TASK_ARG;
 typedef UINT64 KE_HANDLE;
 
+typedef UINT64 HANDLE;
+#define INVALID_HANDLE 0
+
 /* Number of nanoseconds since system boot */
 typedef UINT64 KE_TIME;
 
+typedef struct
+{
+    const char *path;
+    KE_TIME startTime;
+    UINT8 reschedule;
+    KE_TIME periodNanoSeconds;
+    void *pStdout;
+    UINT8 noWindow;
+} PROCESS_PROPERTIES;
+
 /* Kernel function list */
-typedef KE_HANDLE (*KE_SCHEDULE_TASK)(UINT64 entry, KE_TIME startTime, UINT8 reschedule, KE_TIME periodNanoSeconds, KE_TASK_ARG* args);
+typedef KE_HANDLE (*KE_CREATE_PROCESS)(PROCESS_PROPERTIES *properties);
+typedef KE_HANDLE (*KE_SCHEDULE_TASK)(UINT64 entry, KE_TIME startTime, UINT8 reschedule, KE_TIME periodNanoSeconds, UINT64 nArgs, ...);
+typedef void (*KE_SUSPEND_CURRENT_TASK)();
 typedef KE_TIME (*KE_GET_TIME)();
 
 typedef struct
@@ -109,9 +124,14 @@ typedef struct
 
     UINT64 nCores;                      //  Number of cores detected
 
+    UINT64 pDwmDescriptor;
+
     /* Kernel function list */
+    KE_CREATE_PROCESS KeCreateProcess;
     KE_SCHEDULE_TASK KeScheduleTask;
+    KE_SUSPEND_CURRENT_TASK KeSuspendCurrentTask;
     KE_GET_TIME KeGetTime;
+
 } KE_SYS_DESCRIPTOR;
 
 #endif
