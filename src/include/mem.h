@@ -4,6 +4,11 @@
 #include <defs/int.h>
 #include <typedef.h>
 
+#define memset64(buffer, length, value) for(UINT64 i = 0; i < (length); i+=8) *(UINT64*)((UINT64)(buffer) + i) = value
+#define memset32(buffer, length, value) for(UINT64 i = 0; i < length; i+=4) *(UINT32*)((UINT64)buffer + i) = value
+#define memset16(buffer, length, value) for(UINT64 i = 0; i < length; i+=2) *(UINT16*)((UINT64)buffer + i) = value
+#define memset8(buffer, length, value) for(UINT64 i = 0; i < length; i++) *(UINT8*)((UINT64)buffer + i) = value
+
 typedef uint8_t byte;
 
 void* operator new   ( size_t count );
