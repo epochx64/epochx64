@@ -23,3 +23,11 @@
 *.app
 *.elf
 *.bin
+cmake-build-debug/
+ELF_BIN/
+OVMF/
+src/fs/Epoch-RAM-Disk-Generator/.idea/
+src/fs/Epoch-RAM-Disk-Generator/cmake-build-release/
+src/proc/dwm/.idea/
+.idea/
+e
