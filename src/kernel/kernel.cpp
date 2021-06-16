@@ -8,11 +8,7 @@ KE_SYS_DESCRIPTOR *keSysDescriptor;
 /**********************************************************************
  *  Local variables
  *********************************************************************/
-
 static ext2::RAMDisk *keRamDisk;
-
-static UINT8 __attribute__((aligned(16))) keInitStack[8192];
-static UINT8 __attribute__((aligned(16))) keInitFXSave[512];
 
 /**********************************************************************
  *  Function definitions
@@ -38,6 +34,8 @@ void heapPrint()
  *********************************************************************/
 void KeMain(KE_SYS_DESCRIPTOR *kernelInfo)
 {
+    static UINT8 __attribute__((aligned(16))) keInitFXSave[512];
+
     /* Enable SIMD instructions */
     EnableSSE(keInitFXSave);
 
@@ -56,10 +54,7 @@ void KeMain(KE_SYS_DESCRIPTOR *kernelInfo)
     log::kout.pFramebufferInfo = &(keSysDescriptor->gopInfo);
 
     /* Zero the sysmemory bitmap */
-    for(UINT64 i = 0; i < keSysDescriptor->sysMemoryBitMapSize; i+=8)
-    {
-        *(UINT64*)(keSysDescriptor->pSysMemoryBitMap + i) = 0;
-    }
+    memset64(keSysDescriptor->pSysMemoryBitMap, keSysDescriptor->sysMemoryBitMapSize, 0);
 
     /* Set the blocks which store the SysMemory bitmap as occupied */
     KeSysMemBitmapSet(0, keSysDescriptor->sysMemoryBitMapSize/BLOCK_SIZE + 1);
