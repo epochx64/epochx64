@@ -79,7 +79,7 @@ void KeMain(KE_SYS_DESCRIPTOR *kernelInfo)
     /* Initialize RAM disk */
     keRamDisk = new ext2::RAMDisk(keSysDescriptor->pRAMDisk, INITRD_SIZE_BYTES, false);
 
-    PROCESS_PROPERTIES properties;
+    PROCESS_PROPERTIES properties = { 0 };
     properties.pStdout = keStdout;
 
     /* Spawn DWM process */

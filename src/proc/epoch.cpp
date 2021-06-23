@@ -43,7 +43,7 @@ void DwmInitAPI()
 {
     auto dwmDescriptor = (DWM_DESCRIPTOR*)keSysDescriptor->pDwmDescriptor;
 
-    DwmCreateWindow = dwmDescriptor->dwmCreateWindow;
+    DwmCreateWindow = dwmDescriptor->DwmCreateWindow;
 }
 
 void _epochstart(KE_SYS_DESCRIPTOR *sysDescriptor, STDOUT *out, UINT8 noWindow)
@@ -62,7 +62,7 @@ void _epochstart(KE_SYS_DESCRIPTOR *sysDescriptor, STDOUT *out, UINT8 noWindow)
 
     if(!noWindow)
     {
-        DWM_WINDOW_PROPERTIES properties;
+        DWM_WINDOW_PROPERTIES properties = { 0 };
         properties.pStdout = (UINT64)stdout;
         properties.height = 400;
         properties.width = 600;

@@ -102,7 +102,7 @@ UINT8 *ReadFile(UINT16* Path)
 EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 {
     EFI_STATUS Status;
-    KE_SYS_DESCRIPTOR KernelInfo;
+    KE_SYS_DESCRIPTOR KernelInfo = { 0 };
 
     _ImageHandle = ImageHandle;
 
