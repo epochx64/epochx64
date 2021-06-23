@@ -67,8 +67,7 @@ void Scheduler::AddTask(Task *t)
  *********************************************************************/
 void Scheduler::RemoveCurrentTask()
 {
-    //TODO: Make this less ugly with helper functions
-    nTasks--;
+    //TODO: Make this less ugly with helper functions, or use a linked list class
 
     /* Traverse the linked list to get the previous element before currentTask */
     Task *currentTaskIter = activeTaskList;
@@ -107,9 +106,10 @@ void Scheduler::RemoveCurrentTask()
     /* If the current task is not meant to repeat */
     if(!currentTask->reschedule)
     {
+        nTasks--;
         currentTask = activeTaskList;
         /* TODO: Add a destructor for tasks */
-        delete currentTask;
+        //delete currentTask;
 
         return;
     }
