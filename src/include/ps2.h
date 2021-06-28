@@ -3,8 +3,11 @@
 
 #include <defs/int.h>
 
-#define STATE_PRESSED  1
-#define STATE_RELEASED 0
+enum KEY_STATE
+{
+    STATE_RELEASED = 0,
+    STATE_PRESSED = 1,
+};
 
 typedef UINT8 STATE;
 
@@ -16,7 +19,7 @@ typedef struct
 
     STATE tilda;
     STATE num[2][10];   /* [0][]: left, [1][]: right */
-    STATE dash;
+    STATE dash[2];
     STATE equal;
     STATE backspace;
 
@@ -32,6 +35,8 @@ typedef struct
     STATE slash[2];
 
     STATE letter[26];
+
+    STATE space;
 
     STATE del;
     STATE insert;
@@ -51,14 +56,24 @@ typedef struct
 
     STATE scrollLock;
     STATE numLock;
+
+    STATE asterisk;
+    STATE plus;
+
+    STATE arrowUp;
+    STATE arrowDown;
+    STATE arrowLeft;
+    STATE arrowRight;
 } KEYBOARD_STATE;
 
 typedef struct
 {
-    STATE leftMouse;
-    STATE rightMouse;
-    STATE scrollUp;
-    STATE scrollDown;
+    STATE left;
+    STATE right;
+    STATE middle;
+
+    UINT64 x;
+    UINT64 y;
 } MOUSE_STATE;
 
 UINT8 UpdateKbdState(UINT8 scanCode, KEYBOARD_STATE *kbdState);

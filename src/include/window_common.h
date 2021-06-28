@@ -27,11 +27,17 @@ typedef struct
     /* Pointer to STDOUT struct */
     UINT64 pStdout;
 
+    /* Called when a keyboard or mouse event occurs */
+    void (*KeyboardEventCallback)(UINT8 data, void *state);
+    void (*MouseEventCallback)(UINT8 data, void *state);
+
     /* Pointer to another struct e.g. TERMINAL_PROPERTIES */
     UINT64 pSecondaryProperties;
 } DWM_WINDOW_PROPERTIES;
 
 typedef HANDLE (*DWM_CREATE_WINDOW)(DWM_WINDOW_PROPERTIES *properties);
+typedef void (*DWM_KEYBOARD_EVENT)(UINT8 data);
+typedef void (*DWM_MOUSE_EVENT)(UINT8 data, UINT64 mousePacketSize);
 
 typedef struct
 {
@@ -41,7 +47,9 @@ typedef struct
     UINT64 refreshRate;
 
     /* DWM function list */
-    DWM_CREATE_WINDOW dwmCreateWindow;
+    DWM_CREATE_WINDOW DwmCreateWindow;
+    DWM_KEYBOARD_EVENT DwmKeyboardEvent;
+    DWM_MOUSE_EVENT DwmMouseEvent;
 
 } DWM_DESCRIPTOR;
 

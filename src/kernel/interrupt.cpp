@@ -87,24 +87,19 @@ namespace interrupt
     {
         keSchedulers[APICID()]->Tick();
 
-        //  Signal End of Interrupt
+        /* Signal End of Interrupt */
         SetLAPICRegister<UINT32>(keSysDescriptor->apicBase, 0x0B0, 0x00);
     }
 
     void ISR33KeyboardHandler()
     {
-        /*
-         * TODO: Typing on keyboard and using mouse simultaneously will sometimes
-         *       cause generated keyboard/mouse IRQs to get handled by the wrong respective ISR
-         *       Appears to only happen in QEMU
-         *
-         *       TODO: Implement a proper keyboard driver
-         */
-
         UINT8 Scancode = inb(0x60);
-        if (Scancode == 0x1C) printf("\n");
-        else printf("%02x ", Scancode);
-        //kout << HEX << Scancode << " ";
+
+        /* The function pointer is null until dwm is launched */
+        if (((DWM_DESCRIPTOR*)keSysDescriptor->pDwmDescriptor)->DwmKeyboardEvent != nullptr)
+        {
+            ((DWM_DESCRIPTOR*)keSysDescriptor->pDwmDescriptor)->DwmKeyboardEvent(Scancode);
+        }
 
         outb(0x20, 0x20);   //  End of interrupt
     }
@@ -117,33 +112,14 @@ namespace interrupt
 
     void ISR44MouseHandler()
     {
-        static UINT8 mouseCycle{0};
-        static int x{420}, y{420};
-        static UINT8 mouseData[3];
-
-        /*
-         * Wait for PS/2 mouse data
-         */
+        /* Wait for PS/2 mouse data */
         UINT8 Scancode = inb(0x60);
 
-        /*
-         * Mouse sends 3 separate interrupts per mouse event
-         */
-        mouseData[mouseCycle] = Scancode;
-
-        if(mouseCycle == 2)
+        /* The function pointer is null until dwm is launched */
+        if (((DWM_DESCRIPTOR*)keSysDescriptor->pDwmDescriptor)->DwmMouseEvent != nullptr)
         {
-            x = x + ((int)mouseData[1] - (int)(((UINT16)mouseData[0] << 4) & 0x0100));
-            y = y - ((int)mouseData[2] - (int)(((UINT16)mouseData[0] << 3) & 0x0100));
+            ((DWM_DESCRIPTOR*)keSysDescriptor->pDwmDescriptor)->DwmMouseEvent(Scancode, MousePacketSize);
         }
-
-        mouseCycle = (mouseCycle + 1) % MousePacketSize;
-
-        /*
-         * TODO: Future mouse handling code belongs elsewhere since the interrupt cannot take a huge amount of time
-         *       to execute (schedule a task here instead of doing the work here)
-         */
-        graphics::PutPixel(x, y, &(keSysDescriptor->gopInfo), COLOR_WHITE);
 
         outb(0xA0, 0x20);   //  EOI for the slave PIC
         outb(0x20, 0x20);   //  End of interrupt

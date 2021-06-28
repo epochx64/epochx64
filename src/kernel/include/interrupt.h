@@ -9,6 +9,7 @@
 #include <scheduler.h>
 #include <acpi.h>
 #include <pic.h>
+#include <window_common.h>
 
 namespace interrupt
 {

@@ -1,14 +1,10 @@
 #include "dwm.h"
 
 /**********************************************************************
- *  Global variables
- *********************************************************************/
-
-DWM_DESCRIPTOR dwmDescriptor;
-
-/**********************************************************************
  *  Local variables
  *********************************************************************/
+
+static DWM_DESCRIPTOR dwmDescriptor;
 
 /* Used for measuring the time delta between consecutive ticks of DwmGfxRoutine */
 static KE_TIME prevTime = 0;
@@ -23,6 +19,12 @@ static WINDOW_LIST_NODE *dwmWindowListTail = nullptr;
 
 /* Windows that are minimized are here */
 static WINDOW_LIST_NODE *dwmInactiveWindowList = nullptr;
+
+/* Keyboard and mouse states */
+static KEYBOARD_STATE dwmKeyboardState = { 0 };
+static MOUSE_STATE dwmMouseState = { 0 };
+
+static EVENT_HOOK_NODE *dwmEventHookLists[2] = { nullptr };
 
 /**********************************************************************
  *  Function definitions
@@ -43,6 +45,12 @@ HANDLE DwmApiCreateWindow(DWM_WINDOW_PROPERTIES *properties)
     node->pPrev = nullptr;
     node->properties = new DWM_WINDOW_PROPERTIES;
     *(node->properties) = *properties;
+
+    /* Terminal windows have a designated callback for keyboard interrupts */
+    if (node->properties->type == WINDOW_TYPE_TERMINAL)
+    {
+        node->properties->KeyboardEventCallback = (void(*)(UINT8, void *))&DwmTerminalWindowKbdEvent;
+    }
 
     /* If the list is empty */
     if ((dwmWindowListHead == nullptr) || (dwmWindowListTail == nullptr))
@@ -97,16 +105,15 @@ void DwmInit()
     dwmDescriptor.frameBufferInfo.pFrameBuffer = (UINT64)(KeSysMalloc(dwmDescriptor.frameBufferSize));
 
     /* Initialize function list */
-    dwmDescriptor.dwmCreateWindow = &DwmApiCreateWindow;
+    dwmDescriptor.DwmCreateWindow = &DwmApiCreateWindow;
+    dwmDescriptor.DwmKeyboardEvent = &DwmKeyboardEvent;
+    dwmDescriptor.DwmMouseEvent = &DwmMouseEvent;
 
     /* Set the system descriptor DWM pointer */
     keSysDescriptor->pDwmDescriptor = (UINT64)&dwmDescriptor;
 
     /* Clear the double buffer */
-    for(UINT64 i = 0; i < dwmDescriptor.frameBufferSize; i += 8)
-    {
-        *(UINT64*)(dwmDescriptor.frameBufferInfo.pFrameBuffer + i) = 0;
-    }
+    memset64(dwmDescriptor.frameBufferInfo.pFrameBuffer, dwmDescriptor.frameBufferSize, 0);
 
     /* Initialize timekeeping variables */
     currentTime = KeGetTime();
@@ -129,10 +136,7 @@ void DwmSwapBuffers(UINT64 *dstBuf, UINT64 *srcBuf, UINT64 size)
  *********************************************************************/
 void DwmClearFramebuffer(UINT64 *dstBuf, UINT64 size)
 {
-    for (UINT64 i = 0; i < (size/8); i++)
-    {
-        *(dstBuf + i) = 0;
-    }
+    memset64(dstBuf, size, 0);
 }
 
 /**********************************************************************
@@ -227,9 +231,9 @@ void DwmDrawWindow(DWM_WINDOW_PROPERTIES *properties)
     }
 
     /* Draw inner window */
-    if (properties->type == WINDOW_TYPE_TERMINAL)
+    switch(properties->type)
     {
-        DwmDrawTerminalWindow(properties);
+        case WINDOW_TYPE_TERMINAL: DwmDrawTerminalWindow(properties); break;
     }
 }
 
@@ -273,11 +277,10 @@ void DwmTerminalPutChar(DWM_WINDOW_PROPERTIES *properties, char c, UINT64 line, 
  *  @details Terminal-specific draw function
  *  @param properties - Pointer to window properties struct
  *********************************************************************/
-void DwmDrawTerminalWindow(DWM_WINDOW_PROPERTIES *properties)
-{
-    UINT64 lines = (properties->height)/16;
-    UINT64 columns = (properties->width)/8;
-    STDOUT *stdout = (STDOUT*)properties->pStdout;
+void DwmDrawTerminalWindow(DWM_WINDOW_PROPERTIES *properties) {
+    UINT64 lines = (properties->height) / 16;
+    UINT64 columns = (properties->width) / 8;
+    STDOUT *stdout = (STDOUT *) properties->pStdout;
     UINT64 offsetIter = stdout->offset;
 
     auto x = properties->x;
@@ -286,30 +289,25 @@ void DwmDrawTerminalWindow(DWM_WINDOW_PROPERTIES *properties)
     auto height = properties->height;
     auto width = properties->width;
 
-    auto iter = (UINT32*)(dwmDescriptor.frameBufferInfo.pFrameBuffer + y*pitch + x*4);
+    auto iter = (UINT32 *) (dwmDescriptor.frameBufferInfo.pFrameBuffer + y * pitch + x * 4);
 
     /* Fill background color */
-    for (UINT64 i = 0; i < height; i++)
-    {
-        for (UINT64 j = 0; j < width - 1; j++)
-        {
+    for (UINT64 i = 0; i < height; i++) {
+        for (UINT64 j = 0; j < width - 1; j++) {
             *(iter + j) = TERMINAL_BACKGROUND_COLOR;
         }
 
-        iter += (pitch/4);
+        iter += (pitch / 4);
     }
 
     /* Start at the end of the stdout, walk back until enough data loaded to fill whole terminal
      * TODO: This +2 -2 is a bad fix*/
     bool done = false;
-    for (UINT64 i = 0; i < lines; i++)
-    {
-        for (UINT64 j = 0; j < columns-1; j++)
-        {
+    for (UINT64 i = 0; i < lines; i++) {
+        for (UINT64 j = 0; j < columns - 1; j++) {
             char c = *(stdout->pData + offsetIter);
 
-            if (offsetIter == stdout->originOffset)
-            {
+            if (offsetIter == stdout->originOffset) {
                 offsetIter -= 2;
                 done = true;
                 break;
@@ -327,20 +325,300 @@ void DwmDrawTerminalWindow(DWM_WINDOW_PROPERTIES *properties)
     offsetIter += 2;
 
     /* Step through offset, print the string */
-    for (UINT64 i = 0; i < lines; i++)
-    {
-        for (UINT64 j = 0; j < columns-1; j++)
-        {
+    for (UINT64 i = 0; i < lines; i++) {
+        for (UINT64 j = 0; j < columns - 1; j++) {
             char c = *(stdout->pData + offsetIter);
 
             offsetIter = (offsetIter + 1) % STDOUT_DEFAULT_SIZE;
-            if (offsetIter == stdout->offset) return;
+            if (offsetIter == (stdout->offset + 1)) return;
 
             if (c == '\n') break;
 
             DwmTerminalPutChar(properties, c, i, j);
         }
     }
+}
+
+/**********************************************************************
+ *  @details Callback function for keyboard interrupt for a terminal window
+ *  @param data - PS/2 scancode byte from the keyboard
+ *  @param kbdState - Keyboard state descriptor
+ *********************************************************************/
+ void DwmTerminalWindowKbdEvent(UINT8 data, KEYBOARD_STATE *kbdState)
+{
+    static char charMap[] = {
+            /* Map with no shift press */
+            0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 0, 0,
+            97 + 16, 97 + 22, 97 + 4, 97 + 17, 97 + 19, 97 + 24, 97 + 20, 97 + 8, 97 + 14, 97 + 15,
+            '[', ']', 0, 0,
+            97 + 0,97 + 18,97 + 3,97 + 5,97 + 6,97 + 7,97 + 9,97 + 10,97 + 11,
+            ';', '\'', '`', 0, '\\',
+            97 + 25, 97 + 23, 97 + 2, 97 + 21, 97 + 1, 97 + 13, 97 + 12,
+            ',', '.', '/', 0, '*', 0, ' ',
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            '7', '8', '9', '-', '4', '5', '6', '+', '1', '2', '3', '0',
+            '.', 0, 0,
+
+            /* Map with shift press */
+            0, 0, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', 0, 0,
+            65 + 16, 65 + 22, 65 + 4, 65 + 17, 65 + 19, 65 + 24, 65 + 20, 65 + 8, 65 + 14, 65 + 15,
+            '{', '}', 0, 0,
+            65 + 0,65 + 18,65 + 3,65 + 5,65 + 6,65 + 7,65 + 9,65 + 10,65 + 11,
+            ':', '"', '~', 0, '|',
+            65 + 25, 65 + 23, 65 + 2, 65 + 21, 65 + 1, 65 + 13, 65 + 12,
+            '<', '>', '?', 0, '*', 0, ' ',
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            '7', '8', '9', '-', '4', '5', '6', '+', '1', '2', '3', '0',
+            '.', 0, 0,
+    };
+
+    static STATE *e0CharMap[] = {
+            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+            &dwmKeyboardState.ctrl[1], nullptr, nullptr,
+            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+            nullptr, nullptr, nullptr, nullptr, nullptr,
+            &dwmKeyboardState.slash[2], nullptr, nullptr, &dwmKeyboardState.alt[1], nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
+            &dwmKeyboardState.home, &dwmKeyboardState.arrowUp,
+            &dwmKeyboardState.pageUp, nullptr,
+            &dwmKeyboardState.arrowLeft, nullptr,
+            &dwmKeyboardState.arrowRight, nullptr,
+            &dwmKeyboardState.end,
+            &dwmKeyboardState.arrowDown,
+            &dwmKeyboardState.pageDown,
+            &dwmKeyboardState.insert,
+    };
+
+    static bool isE0Key = false;
+
+    /* Check shift, alt, ctrl statuses */
+    bool shift, alt, ctrl;
+    if ( (STATE_PRESSED == kbdState->shift[0]) || (STATE_PRESSED == kbdState->shift[1]) ) shift = true;
+    else shift = false;
+    if ( (STATE_PRESSED == kbdState->alt[0]) || (STATE_PRESSED == kbdState->alt[1]) ) alt = true;
+    else alt = false;
+    if ( (STATE_PRESSED == kbdState->ctrl[0]) || (STATE_PRESSED == kbdState->ctrl[1]) ) ctrl = true;
+    else ctrl = false;
+
+    /* Check for E0 key */
+    if (data == 0xE0)
+    {
+        isE0Key = true;
+        return;
+    }
+    if (isE0Key)
+    {
+        isE0Key = false;
+
+        return;
+    }
+
+    /* If bit 7 is set, this is a release event */
+    if (data & 0x80)
+    {
+        return;
+    }
+
+    if (shift)
+    {
+        data += sizeof(charMap)/2;
+    }
+    data = charMap[data];
+
+    if (data == 0)
+    {
+        return;
+    }
+
+    char str[2] = {(char)data, 0};
+    printf(str);
+}
+
+/**********************************************************************
+ *  @details Called on every keyboard interrupt
+ *  @param data - PS/2 scancode byte from the keyboard
+ *********************************************************************/
+void DwmKeyboardEvent(UINT8 data)
+{
+    static UINT64 keyStates[] = {
+            0,
+            offsetof(KEYBOARD_STATE, esc),
+            offsetof(KEYBOARD_STATE, num[0][0]),
+            offsetof(KEYBOARD_STATE, num[0][1]),
+            offsetof(KEYBOARD_STATE, num[0][2]),
+            offsetof(KEYBOARD_STATE, num[0][3]),
+            offsetof(KEYBOARD_STATE, num[0][4]),
+            offsetof(KEYBOARD_STATE, num[0][5]),
+            offsetof(KEYBOARD_STATE, num[0][6]),
+            offsetof(KEYBOARD_STATE, num[0][7]),
+            offsetof(KEYBOARD_STATE, num[0][8]),
+            offsetof(KEYBOARD_STATE, num[0][9]),
+            offsetof(KEYBOARD_STATE, dash[0]),
+            offsetof(KEYBOARD_STATE, equal),
+            offsetof(KEYBOARD_STATE, backspace),
+            offsetof(KEYBOARD_STATE, tab),
+            offsetof(KEYBOARD_STATE, letter[16]),
+            offsetof(KEYBOARD_STATE, letter[22]),
+            offsetof(KEYBOARD_STATE, letter[4]),
+            offsetof(KEYBOARD_STATE, letter[17]),
+            offsetof(KEYBOARD_STATE, letter[19]),
+            offsetof(KEYBOARD_STATE, letter[24]),
+            offsetof(KEYBOARD_STATE, letter[20]),
+            offsetof(KEYBOARD_STATE, letter[8]),
+            offsetof(KEYBOARD_STATE, letter[14]),
+            offsetof(KEYBOARD_STATE, letter[15]),
+            offsetof(KEYBOARD_STATE, openBracket),
+            offsetof(KEYBOARD_STATE, closeBracket),
+            offsetof(KEYBOARD_STATE, enter[0]),
+            offsetof(KEYBOARD_STATE, ctrl[0]),
+            offsetof(KEYBOARD_STATE, letter[0]),
+            offsetof(KEYBOARD_STATE, letter[18]),
+            offsetof(KEYBOARD_STATE, letter[3]),
+            offsetof(KEYBOARD_STATE, letter[5]),
+            offsetof(KEYBOARD_STATE, letter[6]),
+            offsetof(KEYBOARD_STATE, letter[7]),
+            offsetof(KEYBOARD_STATE, letter[9]),
+            offsetof(KEYBOARD_STATE, letter[10]),
+            offsetof(KEYBOARD_STATE, letter[11]),
+            offsetof(KEYBOARD_STATE, semicolon),
+            offsetof(KEYBOARD_STATE, apostrophe),
+            offsetof(KEYBOARD_STATE, tilda),
+            offsetof(KEYBOARD_STATE, shift[0]),
+            offsetof(KEYBOARD_STATE, backslash),
+            offsetof(KEYBOARD_STATE, letter[25]),
+            offsetof(KEYBOARD_STATE, letter[23]),
+            offsetof(KEYBOARD_STATE, letter[2]),
+            offsetof(KEYBOARD_STATE, letter[21]),
+            offsetof(KEYBOARD_STATE, letter[1]),
+            offsetof(KEYBOARD_STATE, letter[13]),
+            offsetof(KEYBOARD_STATE, letter[12]),
+            offsetof(KEYBOARD_STATE, comma),
+            offsetof(KEYBOARD_STATE, period[0]),
+            offsetof(KEYBOARD_STATE, slash[0]),
+            offsetof(KEYBOARD_STATE, shift[1]),
+            offsetof(KEYBOARD_STATE, asterisk),
+            offsetof(KEYBOARD_STATE, alt[0]),
+            offsetof(KEYBOARD_STATE, space),
+            offsetof(KEYBOARD_STATE, caps),
+            offsetof(KEYBOARD_STATE, func[0]),
+            offsetof(KEYBOARD_STATE, func[1]),
+            offsetof(KEYBOARD_STATE, func[2]),
+            offsetof(KEYBOARD_STATE, func[3]),
+            offsetof(KEYBOARD_STATE, func[4]),
+            offsetof(KEYBOARD_STATE, func[5]),
+            offsetof(KEYBOARD_STATE, func[6]),
+            offsetof(KEYBOARD_STATE, func[7]),
+            offsetof(KEYBOARD_STATE, func[8]),
+            offsetof(KEYBOARD_STATE, func[9]),
+            offsetof(KEYBOARD_STATE, numLock),
+            offsetof(KEYBOARD_STATE, scrollLock),
+            offsetof(KEYBOARD_STATE, num[1][7]),
+            offsetof(KEYBOARD_STATE, num[1][8]),
+            offsetof(KEYBOARD_STATE, num[1][9]),
+            offsetof(KEYBOARD_STATE, dash[1]),
+            offsetof(KEYBOARD_STATE, num[1][4]),
+            offsetof(KEYBOARD_STATE, num[1][5]),
+            offsetof(KEYBOARD_STATE, num[1][6]),
+            offsetof(KEYBOARD_STATE, plus),
+            offsetof(KEYBOARD_STATE, num[1][1]),
+            offsetof(KEYBOARD_STATE, num[1][2]),
+            offsetof(KEYBOARD_STATE, num[1][3]),
+            offsetof(KEYBOARD_STATE, num[1][0]),
+            offsetof(KEYBOARD_STATE, period[1]),
+            offsetof(KEYBOARD_STATE, func[10]),
+            offsetof(KEYBOARD_STATE, func[11]),
+    };
+
+    static UINT64 e0KeyStates[] = {
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            offsetof(KEYBOARD_STATE, ctrl[1]), 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            offsetof(KEYBOARD_STATE, slash[2]), 0, 0, offsetof(KEYBOARD_STATE, alt[1]), 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0,
+            offsetof(KEYBOARD_STATE, home), offsetof(KEYBOARD_STATE, arrowUp),
+            offsetof(KEYBOARD_STATE, pageUp), 0,
+            offsetof(KEYBOARD_STATE, arrowLeft), 0,
+            offsetof(KEYBOARD_STATE, arrowRight), 0,
+            offsetof(KEYBOARD_STATE, end),
+            offsetof(KEYBOARD_STATE, arrowDown),
+            offsetof(KEYBOARD_STATE, pageDown),
+            offsetof(KEYBOARD_STATE, insert),
+    };
+
+    static bool isE0Key = false;
+
+    /*
+     * TODO: Typing on keyboard and using mouse simultaneously will sometimes
+     *       cause generated keyboard/mouse IRQs to get handled by the wrong respective ISR
+     *       Appears to only happen in QEMU
+     */
+
+    if (data == 0xE0)
+    {
+        isE0Key = true;
+    }
+    else
+    {
+        /* If bit 7 is set, this is a release event */
+        UINT64 offset = data - (data & 0x80);
+
+        /* Get key state pointers */
+        auto keyState = (STATE*)((UINT64)&dwmKeyboardState + keyStates[offset]);
+        auto e0KeyState = (STATE*)((UINT64)&dwmKeyboardState + e0KeyStates[offset]);
+
+        /* Set the key states in the corresponding structure */
+        if (isE0Key)
+        {
+            *e0KeyState = (data & 0x80)? STATE_RELEASED : STATE_PRESSED;
+            isE0Key = false;
+        }
+        else *keyState = (data & 0x80)? STATE_RELEASED : STATE_PRESSED;
+    }
+
+    /* Pass this event to everything that has it hooked */
+    for (EVENT_HOOK_NODE *node = dwmEventHookLists[KEYBOARD_EVENT]; node != nullptr; node = node->pNext)
+    {
+        KeScheduleTask((UINT64)node->EventCallBack, KeGetTime(), false, 0, 2, data, &dwmKeyboardState);
+    }
+
+    /* Pass this event to the currently focused window */
+    auto KeyboardEvent = dwmWindowListHead->properties->KeyboardEventCallback;
+    if (KeyboardEvent != nullptr)
+    {
+        KeScheduleTask((UINT64)KeyboardEvent, KeGetTime(), false, 0, 2, data, &dwmKeyboardState);
+    }
+
+    /* Temporary */
+    //if (data == 0x1C) printf("\n");
+    //else printf("%02x ", data);
+}
+
+/**********************************************************************
+ *  @details Called on every mouse interrupt
+ *  @param data - PS/2 scancode byte from the mouse
+ *********************************************************************/
+void DwmMouseEvent(UINT8 data, UINT64 mousePacketSize)
+{
+    static UINT8 mouseCycle{0};
+    static int x{420}, y{420};
+    static UINT8 mouseData[3];
+
+    /* Mouse sends 3 separate interrupts per event */
+    mouseData[mouseCycle] = data;
+
+    /* Once we have all the data */
+    if(mouseCycle == 2)
+    {
+        x = x + ((int)mouseData[1] - (int)(((UINT16)mouseData[0] << 4) & 0x0100));
+        y = y - ((int)mouseData[2] - (int)(((UINT16)mouseData[0] << 3) & 0x0100));
+    }
+
+    mouseCycle = (mouseCycle + 1) % mousePacketSize;
+
+    graphics::PutPixel(x, y, &(dwmDescriptor.frameBufferInfo), COLOR_WHITE);
 }
 
 int main()

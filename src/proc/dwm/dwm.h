@@ -9,6 +9,7 @@
 #include <math/math.h>
 #include <window_common.h>
 #include <font_rom.h>
+#include <ps2.h>
 
 /**********************************************************************
  *  Definitions
@@ -21,6 +22,18 @@ typedef struct WINDOW_LIST_NODE
     WINDOW_LIST_NODE *pPrev;
 
 } WINDOW_LIST_NODE;
+
+enum EVENT_HOOK_LIST_ID
+{
+    KEYBOARD_EVENT = 0,
+    MOUSE_EVENT = 1
+};
+
+typedef struct EVENT_HOOK_NODE
+{
+    void (*EventCallBack)(UINT8 data, void *state);
+    EVENT_HOOK_NODE *pNext;
+} EVENT_HOOK_NODE;
 
 #define WINDOW_ACCENT_HEIGHT 30
 #define WINDOW_ACCENT_COLOR 0xFF2A242A
@@ -80,5 +93,24 @@ void DwmDrawWindow(DWM_WINDOW_PROPERTIES *properties);
  *  @param properties - Pointer to window properties struct
  *********************************************************************/
 void DwmDrawTerminalWindow(DWM_WINDOW_PROPERTIES *properties);
+
+/**********************************************************************
+ *  @details Callback function for keyboard interrupt for a terminal window
+ *  @param data - PS/2 scancode byte from the keyboard
+ *  @param kbdState - Keyboard state descriptor
+ *********************************************************************/
+void DwmTerminalWindowKbdEvent(UINT8 data, KEYBOARD_STATE *kbdState);
+
+/**********************************************************************
+ *  @details Called on every keyboard interrupt
+ *  @param data - PS/2 scancode byte from the keyboard
+ *********************************************************************/
+void DwmKeyboardEvent(UINT8 data);
+
+/**********************************************************************
+ *  @details Called on every mouse interrupt
+ *  @param data - PS/2 scancode byte from the mouse
+ *********************************************************************/
+void DwmMouseEvent(UINT8 data, UINT64 mousePacketSize);
 
 #endif
