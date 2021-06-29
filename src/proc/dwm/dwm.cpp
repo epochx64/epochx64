@@ -350,7 +350,7 @@ void DwmDrawTerminalWindow(DWM_WINDOW_PROPERTIES *properties) {
             /* Map with no shift press */
             0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 0, 0,
             97 + 16, 97 + 22, 97 + 4, 97 + 17, 97 + 19, 97 + 24, 97 + 20, 97 + 8, 97 + 14, 97 + 15,
-            '[', ']', 0, 0,
+            '[', ']', '\n', 0,
             97 + 0,97 + 18,97 + 3,97 + 5,97 + 6,97 + 7,97 + 9,97 + 10,97 + 11,
             ';', '\'', '`', 0, '\\',
             97 + 25, 97 + 23, 97 + 2, 97 + 21, 97 + 1, 97 + 13, 97 + 12,
@@ -362,7 +362,7 @@ void DwmDrawTerminalWindow(DWM_WINDOW_PROPERTIES *properties) {
             /* Map with shift press */
             0, 0, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', 0, 0,
             65 + 16, 65 + 22, 65 + 4, 65 + 17, 65 + 19, 65 + 24, 65 + 20, 65 + 8, 65 + 14, 65 + 15,
-            '{', '}', 0, 0,
+            '{', '}', '\n', 0,
             65 + 0,65 + 18,65 + 3,65 + 5,65 + 6,65 + 7,65 + 9,65 + 10,65 + 11,
             ':', '"', '~', 0, '|',
             65 + 25, 65 + 23, 65 + 2, 65 + 21, 65 + 1, 65 + 13, 65 + 12,
@@ -372,22 +372,22 @@ void DwmDrawTerminalWindow(DWM_WINDOW_PROPERTIES *properties) {
             '.', 0, 0,
     };
 
-    static STATE *e0CharMap[] = {
-            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-            &dwmKeyboardState.ctrl[1], nullptr, nullptr,
-            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-            nullptr, nullptr, nullptr, nullptr, nullptr,
-            &dwmKeyboardState.slash[2], nullptr, nullptr, &dwmKeyboardState.alt[1], nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-            &dwmKeyboardState.home, &dwmKeyboardState.arrowUp,
-            &dwmKeyboardState.pageUp, nullptr,
-            &dwmKeyboardState.arrowLeft, nullptr,
-            &dwmKeyboardState.arrowRight, nullptr,
-            &dwmKeyboardState.end,
-            &dwmKeyboardState.arrowDown,
-            &dwmKeyboardState.pageDown,
-            &dwmKeyboardState.insert,
+    static UINT64 e0KeyStates[] = {
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            offsetof(KEYBOARD_STATE, ctrl[1]), 0, 0,
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0,
+            offsetof(KEYBOARD_STATE, slash[2]), 0, 0, offsetof(KEYBOARD_STATE, alt[1]), 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0, 0, 0, 0, 0,
+            offsetof(KEYBOARD_STATE, home), offsetof(KEYBOARD_STATE, arrowUp),
+            offsetof(KEYBOARD_STATE, pageUp), 0,
+            offsetof(KEYBOARD_STATE, arrowLeft), 0,
+            offsetof(KEYBOARD_STATE, arrowRight), 0,
+            offsetof(KEYBOARD_STATE, end),
+            offsetof(KEYBOARD_STATE, arrowDown),
+            offsetof(KEYBOARD_STATE, pageDown),
+            offsetof(KEYBOARD_STATE, insert),
     };
 
     static bool isE0Key = false;
