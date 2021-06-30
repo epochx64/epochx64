@@ -70,7 +70,10 @@ typedef struct
 typedef UINT64 KE_TASK_ARG;
 typedef UINT64 KE_HANDLE;
 
+#ifndef WINDOWS_H
 typedef UINT64 HANDLE;
+#endif
+
 #define INVALID_HANDLE 0
 
 /* Number of nanoseconds since system boot */

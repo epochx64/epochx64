@@ -25,7 +25,7 @@ LIB_TARGETS = epstring mem math/math elf/relocation ../fs/ext2 io
 ASM_TARGETS = lib/asm/asm kernel/interrupt kernel/kernel
 
 #TODO:	ramdisk generator needs to be manually updated before adding new targets here
-PROC_TARGETS = test dwm
+PROC_TARGETS = terminal dwm
 
 all: efi $(KERNEL_TARGETS) $(LIB_TARGETS) $(ASM_TARGETS) $(PROC_TARGETS) link
 

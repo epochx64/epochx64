@@ -1,6 +1,8 @@
+#define WINDOWS_H
+
 #include <iostream>
-#include <windows.h>
 #include <fs/ext2.h>
+#include <windows.h>
 
 ext2::STATUS ReadFileToRamDisk(TCHAR *WinPath, UINT8 *RAMPath, ext2::RAMDisk *RAMDisk)
 {
@@ -70,7 +72,7 @@ int main()
     initRamDisk.MakeDir((UINT8*)"/boot");
 
     ReadFileToRamDisk((TCHAR*)"index", (UINT8*)"/boot/index", &initRamDisk);
-    ReadFileToRamDisk((TCHAR*)"test.elf", (UINT8*)"/boot/test.elf", &initRamDisk);
+    ReadFileToRamDisk((TCHAR*)"terminal.elf", (UINT8*)"/boot/terminal.elf", &initRamDisk);
     ReadFileToRamDisk((TCHAR*)"dwm.elf", (UINT8*)"/boot/dwm.elf", &initRamDisk);
 
     ext2::FILE testFile;

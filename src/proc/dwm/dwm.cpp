@@ -590,10 +590,6 @@ void DwmKeyboardEvent(UINT8 data)
     {
         KeScheduleTask((UINT64)KeyboardEvent, KeGetTime(), false, 0, 2, data, &dwmKeyboardState);
     }
-
-    /* Temporary */
-    //if (data == 0x1C) printf("\n");
-    //else printf("%02x ", data);
 }
 
 /**********************************************************************

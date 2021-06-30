@@ -1,4 +1,4 @@
-NAME = test
+NAME = terminal
 
 CXX = x86_64-elf-g++.exe
 CFLAGS = -fPIE -ffreestanding -O2 -w -Wall -Wextra -fno-exceptions -fno-rtti -Wunused-parameter

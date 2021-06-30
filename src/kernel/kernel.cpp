@@ -91,7 +91,7 @@ void KeMain(KE_SYS_DESCRIPTOR *kernelInfo)
     KeCreateProcess(&properties);
 
     /* Spawn test process */
-    properties.path = "/boot/test.elf";
+    properties.path = "/boot/terminal.elf";
     properties.startTime = KeGetTime() + 0.5e9;
     properties.noWindow = false;
     KeCreateProcess(&properties);
