@@ -95,13 +95,6 @@ void DwmDrawWindow(DWM_WINDOW_PROPERTIES *properties);
 void DwmDrawTerminalWindow(DWM_WINDOW_PROPERTIES *properties);
 
 /**********************************************************************
- *  @details Callback function for keyboard interrupt for a terminal window
- *  @param data - PS/2 scancode byte from the keyboard
- *  @param kbdState - Keyboard state descriptor
- *********************************************************************/
-void DwmTerminalWindowKbdEvent(UINT8 data, KEYBOARD_STATE *kbdState);
-
-/**********************************************************************
  *  @details Called on every keyboard interrupt
  *  @param data - PS/2 scancode byte from the keyboard
  *********************************************************************/

@@ -17,4 +17,7 @@ extern KE_SCHEDULE_TASK KeScheduleTask;
 extern KE_SUSPEND_CURRENT_TASK KeSuspendCurrentTask;
 extern KE_GET_TIME KeGetTime;
 
+/* DWM function list */
+extern DWM_CREATE_WINDOW DwmCreateWindow;
+
 #endif

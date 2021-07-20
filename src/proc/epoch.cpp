@@ -5,7 +5,7 @@
  *********************************************************************/
 
 extern __attribute__((sysv_abi)) int main();
-extern "C" void __attribute__((sysv_abi)) _epochstart(KE_SYS_DESCRIPTOR* kernelDescriptor, STDOUT *out, UINT8 noWindow);
+extern "C" void __attribute__((sysv_abi)) _epochstart(KE_SYS_DESCRIPTOR *sysDescriptor, STDOUT *out, STDIN *in, UINT8 noWindow);
 
 /**********************************************************************
  *  Global variables
@@ -46,32 +46,27 @@ void DwmInitAPI()
     DwmCreateWindow = dwmDescriptor->DwmCreateWindow;
 }
 
-void _epochstart(KE_SYS_DESCRIPTOR *sysDescriptor, STDOUT *out, UINT8 noWindow)
+void _epochstart(KE_SYS_DESCRIPTOR *sysDescriptor, STDOUT *out, STDIN *in, UINT8 noWindow)
 {
+    /* Set global variables */
     keSysDescriptor = sysDescriptor;
     log::kout.pFramebufferInfo = &(sysDescriptor->gopInfo);
     keRamDisk = (ext2::RAMDisk*)keSysDescriptor->pRAMDisk;
 
+    /* Initialize process heap and API function pointers */
     heap::init();
     KeInitAPI();
     DwmInitAPI();
 
-    STDOUT *stdout;
-    stdout = (out == nullptr) ? createStdout():out;
+    /* Assign stdin/out objects */
+    STDOUT *stdout = (out == nullptr) ? createStdout():out;
+    STDIN *stdin = (in == nullptr) ? createStdin():in;
     setStdout(stdout);
+    setStdin(stdin);
 
     if(!noWindow)
     {
-        DWM_WINDOW_PROPERTIES properties = { 0 };
-        properties.pStdout = (UINT64)stdout;
-        properties.height = 400;
-        properties.width = 600;
-        properties.state = WINDOW_STATE_FOCUED;
-        properties.type = WINDOW_TYPE_TERMINAL;
-        properties.x = 200;
-        properties.y = 100;
 
-        DwmCreateWindow(&properties);
     }
 
     main();

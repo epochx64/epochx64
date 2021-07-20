@@ -26,6 +26,7 @@ typedef struct
 
     /* Pointer to STDOUT struct */
     UINT64 pStdout;
+    UINT64 pStdin;
 
     /* Called when a keyboard or mouse event occurs */
     void (*KeyboardEventCallback)(UINT8 data, void *state);

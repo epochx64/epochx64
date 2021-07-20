@@ -86,6 +86,7 @@ typedef struct
     UINT8 reschedule;
     KE_TIME periodNanoSeconds;
     void *pStdout;
+    void *pStdin;
     UINT8 noWindow;
 } PROCESS_PROPERTIES;
 

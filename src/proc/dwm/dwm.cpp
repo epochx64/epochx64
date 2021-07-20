@@ -26,6 +26,10 @@ static MOUSE_STATE dwmMouseState = { 0 };
 
 static EVENT_HOOK_NODE *dwmEventHookLists[2] = { nullptr };
 
+/* Cursor screen positions */
+static UINT64 cursorX = 420;
+static UINT64 cursorY  = 420;
+
 /**********************************************************************
  *  Function definitions
  *********************************************************************/
@@ -47,10 +51,10 @@ HANDLE DwmApiCreateWindow(DWM_WINDOW_PROPERTIES *properties)
     *(node->properties) = *properties;
 
     /* Terminal windows have a designated callback for keyboard interrupts */
-    if (node->properties->type == WINDOW_TYPE_TERMINAL)
-    {
-        node->properties->KeyboardEventCallback = (void(*)(UINT8, void *))&DwmTerminalWindowKbdEvent;
-    }
+    //if ((node->properties->type == WINDOW_TYPE_TERMINAL) && (node->properties->KeyboardEventCallback == nullptr))
+    //{
+    //    node->properties->KeyboardEventCallback = (void(*)(UINT8, void *))&DwmTerminalWindowKbdEvent;
+    //}
 
     /* If the list is empty */
     if ((dwmWindowListHead == nullptr) || (dwmWindowListTail == nullptr))
@@ -61,7 +65,7 @@ HANDLE DwmApiCreateWindow(DWM_WINDOW_PROPERTIES *properties)
         return properties->handle;
     }
 
-    /* Insert at top of list */
+    /* Insert at top of list if the window is focused */
     if(properties->type == WINDOW_STATE_FOCUED)
     {
         node->pNext = dwmWindowListHead;
@@ -96,8 +100,8 @@ HANDLE DwmApiCreateWindow(DWM_WINDOW_PROPERTIES *properties)
  *********************************************************************/
 void DwmInit()
 {
-    /* Frames per second */
-    dwmDescriptor.refreshRate = 90;
+    /* Maximum refresh rate */
+    dwmDescriptor.refreshRate = 144;
 
     /* Initialize double buffer */
     dwmDescriptor.frameBufferSize = keSysDescriptor->gopInfo.Width * keSysDescriptor->gopInfo.Height * sizeof(UINT32);
@@ -178,6 +182,13 @@ void DwmDrawWindows()
         DwmDrawWindow(node->properties);
         node = node->pPrev;
     }
+
+    /* Draw mouse cursor */
+    graphics::PutPixel(cursorX, cursorY, &(dwmDescriptor.frameBufferInfo), COLOR_WHITE);
+    graphics::PutPixel(cursorX - 1, cursorY, &(dwmDescriptor.frameBufferInfo), COLOR_WHITE);
+    graphics::PutPixel(cursorX + 1, cursorY, &(dwmDescriptor.frameBufferInfo), COLOR_WHITE);
+    graphics::PutPixel(cursorX, cursorY - 1, &(dwmDescriptor.frameBufferInfo), COLOR_WHITE);
+    graphics::PutPixel(cursorX, cursorY + 1, &(dwmDescriptor.frameBufferInfo), COLOR_WHITE);
 }
 
 /**********************************************************************
@@ -337,102 +348,6 @@ void DwmDrawTerminalWindow(DWM_WINDOW_PROPERTIES *properties) {
             DwmTerminalPutChar(properties, c, i, j);
         }
     }
-}
-
-/**********************************************************************
- *  @details Callback function for keyboard interrupt for a terminal window
- *  @param data - PS/2 scancode byte from the keyboard
- *  @param kbdState - Keyboard state descriptor
- *********************************************************************/
- void DwmTerminalWindowKbdEvent(UINT8 data, KEYBOARD_STATE *kbdState)
-{
-    static char charMap[] = {
-            /* Map with no shift press */
-            0, 0, '1', '2', '3', '4', '5', '6', '7', '8', '9', '0', '-', '=', 0, 0,
-            97 + 16, 97 + 22, 97 + 4, 97 + 17, 97 + 19, 97 + 24, 97 + 20, 97 + 8, 97 + 14, 97 + 15,
-            '[', ']', '\n', 0,
-            97 + 0,97 + 18,97 + 3,97 + 5,97 + 6,97 + 7,97 + 9,97 + 10,97 + 11,
-            ';', '\'', '`', 0, '\\',
-            97 + 25, 97 + 23, 97 + 2, 97 + 21, 97 + 1, 97 + 13, 97 + 12,
-            ',', '.', '/', 0, '*', 0, ' ',
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            '7', '8', '9', '-', '4', '5', '6', '+', '1', '2', '3', '0',
-            '.', 0, 0,
-
-            /* Map with shift press */
-            0, 0, '!', '@', '#', '$', '%', '^', '&', '*', '(', ')', '_', '+', 0, 0,
-            65 + 16, 65 + 22, 65 + 4, 65 + 17, 65 + 19, 65 + 24, 65 + 20, 65 + 8, 65 + 14, 65 + 15,
-            '{', '}', '\n', 0,
-            65 + 0,65 + 18,65 + 3,65 + 5,65 + 6,65 + 7,65 + 9,65 + 10,65 + 11,
-            ':', '"', '~', 0, '|',
-            65 + 25, 65 + 23, 65 + 2, 65 + 21, 65 + 1, 65 + 13, 65 + 12,
-            '<', '>', '?', 0, '*', 0, ' ',
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            '7', '8', '9', '-', '4', '5', '6', '+', '1', '2', '3', '0',
-            '.', 0, 0,
-    };
-
-    static UINT64 e0KeyStates[] = {
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            offsetof(KEYBOARD_STATE, ctrl[1]), 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0,
-            offsetof(KEYBOARD_STATE, slash[2]), 0, 0, offsetof(KEYBOARD_STATE, alt[1]), 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0,
-            offsetof(KEYBOARD_STATE, home), offsetof(KEYBOARD_STATE, arrowUp),
-            offsetof(KEYBOARD_STATE, pageUp), 0,
-            offsetof(KEYBOARD_STATE, arrowLeft), 0,
-            offsetof(KEYBOARD_STATE, arrowRight), 0,
-            offsetof(KEYBOARD_STATE, end),
-            offsetof(KEYBOARD_STATE, arrowDown),
-            offsetof(KEYBOARD_STATE, pageDown),
-            offsetof(KEYBOARD_STATE, insert),
-    };
-
-    static bool isE0Key = false;
-
-    /* Check shift, alt, ctrl statuses */
-    bool shift, alt, ctrl;
-    if ( (STATE_PRESSED == kbdState->shift[0]) || (STATE_PRESSED == kbdState->shift[1]) ) shift = true;
-    else shift = false;
-    if ( (STATE_PRESSED == kbdState->alt[0]) || (STATE_PRESSED == kbdState->alt[1]) ) alt = true;
-    else alt = false;
-    if ( (STATE_PRESSED == kbdState->ctrl[0]) || (STATE_PRESSED == kbdState->ctrl[1]) ) ctrl = true;
-    else ctrl = false;
-
-    /* Check for E0 key */
-    if (data == 0xE0)
-    {
-        isE0Key = true;
-        return;
-    }
-    if (isE0Key)
-    {
-        isE0Key = false;
-
-        return;
-    }
-
-    /* If bit 7 is set, this is a release event */
-    if (data & 0x80)
-    {
-        return;
-    }
-
-    if (shift)
-    {
-        data += sizeof(charMap)/2;
-    }
-    data = charMap[data];
-
-    if (data == 0)
-    {
-        return;
-    }
-
-    char str[2] = {(char)data, 0};
-    printf(str);
 }
 
 /**********************************************************************
@@ -599,7 +514,6 @@ void DwmKeyboardEvent(UINT8 data)
 void DwmMouseEvent(UINT8 data, UINT64 mousePacketSize)
 {
     static UINT8 mouseCycle{0};
-    static int x{420}, y{420};
     static UINT8 mouseData[3];
 
     /* Mouse sends 3 separate interrupts per event */
@@ -608,13 +522,11 @@ void DwmMouseEvent(UINT8 data, UINT64 mousePacketSize)
     /* Once we have all the data */
     if(mouseCycle == 2)
     {
-        x = x + ((int)mouseData[1] - (int)(((UINT16)mouseData[0] << 4) & 0x0100));
-        y = y - ((int)mouseData[2] - (int)(((UINT16)mouseData[0] << 3) & 0x0100));
+        cursorX = cursorX + ((int)mouseData[1] - (int)(((UINT16)mouseData[0] << 4) & 0x0100));
+        cursorY = cursorY - ((int)mouseData[2] - (int)(((UINT16)mouseData[0] << 3) & 0x0100));
     }
 
     mouseCycle = (mouseCycle + 1) % mousePacketSize;
-
-    graphics::PutPixel(x, y, &(dwmDescriptor.frameBufferInfo), COLOR_WHITE);
 }
 
 int main()
