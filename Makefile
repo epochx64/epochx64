@@ -22,7 +22,7 @@ EFI_INCLUDES = -Isrc/include -Isrc/include/uefi -Isrc/include/uefi/X64 -Isrc/inc
 
 KERNEL_TARGETS = kernel log interrupt acpi pic graphics scheduler
 LIB_TARGETS = epstring mem math/math elf/relocation ../fs/ext2 io
-ASM_TARGETS = lib/asm/asm kernel/interrupt kernel/kernel
+ASM_TARGETS = lib/asm/asm kernel/interrupt kernel/kernel lib/ipc/ipc
 
 #TODO:	ramdisk generator needs to be manually updated before adding new targets here
 PROC_TARGETS = terminal dwm

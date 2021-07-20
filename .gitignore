@@ -31,3 +31,4 @@ src/fs/Epoch-RAM-Disk-Generator/cmake-build-release/
 src/proc/dwm/.idea/
 .idea/
 e
+docs/

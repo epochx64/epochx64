@@ -8,7 +8,7 @@ section .text
 global AcquireLock
 AcquireLock:
     ; Perform a test-and-set of bit 0 of arg1
-    lock bts [rdi], 0
+    lock bts qword [rdi], 0
     ; Spin if it is acquired
     jc .spin
     ret
