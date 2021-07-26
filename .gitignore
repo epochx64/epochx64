@@ -32,3 +32,7 @@ src/proc/dwm/.idea/
 .idea/
 e
 docs/
+
+bin/
+
+img/

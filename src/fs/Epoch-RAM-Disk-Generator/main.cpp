@@ -1,31 +1,18 @@
-#define WINDOWS_H
-
 #include <iostream>
 #include <fs/ext2.h>
-#include <windows.h>
+#include <stdlib.h>
 
-ext2::STATUS ReadFileToRamDisk(TCHAR *WinPath, UINT8 *RAMPath, ext2::RAMDisk *RAMDisk)
+ext2::STATUS ReadFileToRamDisk(const char *path, UINT8 *RAMPath, ext2::RAMDisk *RAMDisk)
 {
-    OVERLAPPED ol = {0};
+    FILE *f = fopen(path, "rb");
 
-    HANDLE hFile = CreateFile((LPCSTR)WinPath,
-            GENERIC_READ,
-            FILE_SHARE_READ,
-            nullptr,
-            OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL,
-            nullptr);
+    /* Get file size */
+    fseek(f, 0, SEEK_END);
+    UINT64 fileSize = ftell(f);
+    rewind(f);
 
-    if(hFile == INVALID_HANDLE_VALUE) return STATUS_FAIL;
-
-    UINT64 FileSize;
-    DWORD Low, High;
-
-    Low = GetFileSize(hFile, &High);
-    FileSize = Low | ((UINT64)High >> 32);
-
-    auto readFileBuf = new UINT8[FileSize];
-    ReadFileEx(hFile, (LPVOID)readFileBuf, FileSize, &ol, nullptr);
+    auto readFileBuf = new UINT8[fileSize];
+    fread(readFileBuf, sizeof(UINT8), fileSize, f);
 
     /*
      * Now write buffer to file in RAM Disk
@@ -33,7 +20,7 @@ ext2::STATUS ReadFileToRamDisk(TCHAR *WinPath, UINT8 *RAMPath, ext2::RAMDisk *RA
     ext2::FILE File;
 
     File.Type = FILETYPE_REG;
-    File.Size = FileSize;
+    File.Size = fileSize;
     ::string::strncpy(RAMPath, File.Path, MAX_PATH);
 
     RAMDisk->WriteFile(&File, readFileBuf);
@@ -41,26 +28,11 @@ ext2::STATUS ReadFileToRamDisk(TCHAR *WinPath, UINT8 *RAMPath, ext2::RAMDisk *RA
     return STATUS_OK;
 }
 
-DWORD WriteBufferToFile(TCHAR *WinPath, UINT8* Buffer, UINT64 Size)
+void WriteBufferToFile(const char *path, UINT8* buffer, UINT64 size)
 {
-    HANDLE hFile = CreateFile(WinPath,
-                              GENERIC_WRITE,
-                              0,
-                              nullptr,
-                              CREATE_NEW,
-                              FILE_ATTRIBUTE_NORMAL,
-                              nullptr);
-
-    if(hFile == INVALID_HANDLE_VALUE) return -1;
-
-    DWORD BytesWritten;
-    WriteFile(hFile,
-              Buffer,
-              Size,
-              &BytesWritten,
-              nullptr);
-
-    return BytesWritten;
+    FILE *f = fopen(path, "w");
+    fwrite(buffer, sizeof(UINT8), size, f);
+    fclose(f);
 }
 
 int main()
@@ -71,9 +43,9 @@ int main()
     ext2::RAMDisk initRamDisk((UINT64)ramDiskBuffer, INITRD_SIZE_BYTES);
     initRamDisk.MakeDir((UINT8*)"/boot");
 
-    ReadFileToRamDisk((TCHAR*)"index", (UINT8*)"/boot/index", &initRamDisk);
-    ReadFileToRamDisk((TCHAR*)"terminal.elf", (UINT8*)"/boot/terminal.elf", &initRamDisk);
-    ReadFileToRamDisk((TCHAR*)"dwm.elf", (UINT8*)"/boot/dwm.elf", &initRamDisk);
+    ReadFileToRamDisk("index", (UINT8*)"/boot/index", &initRamDisk);
+    ReadFileToRamDisk("terminal.elf", (UINT8*)"/boot/terminal.elf", &initRamDisk);
+    ReadFileToRamDisk("dwm.elf", (UINT8*)"/boot/dwm.elf", &initRamDisk);
 
     ext2::FILE testFile;
     {
@@ -84,7 +56,7 @@ int main()
         auto readFileBuf = new UINT8[readdFileSz];
         initRamDisk.ReadFile(&testFile, readFileBuf);
 
-        WriteBufferToFile((TCHAR*)"ext2index", readFileBuf, testFile.Size);
+        WriteBufferToFile("ext2index", readFileBuf, testFile.Size);
     }
 
     /*

@@ -4,24 +4,24 @@ NAME = epochx64
 INCLUDES=-Isrc/include -Isrc/kernel/include
 SRC_LOC=./src
 
-CXX = x86_64-elf-g++.exe
+CXX = x86_64-elf-g++
 
 CFLAGS =  -ffreestanding -O2 -w -Wall -Wextra -fno-exceptions -fno-rtti -Wunused-parameter
 
-CC = x86_64-elf-gcc.exe
+CC = x86_64-elf-gcc
 LDFLAGS = -T $(SRC_LOC)/kernel/linker.ld -z max-page-size=4096 -ffreestanding -O2 -nostdlib -lgcc -Wunused-parameter
 
-NASM = nasm.exe
+NASM = nasm
 NASMFLAGS = -felf64
 
 # For compiling the EFI bootloader
-EFI_C = x86_64-w64-mingw32-gcc.exe
+EFI_C = x86_64-w64-mingw32-gcc
 EFI_CFLAGS = -ffreestanding
 EFI_LINKFLAGS = -nostdlib -Wl,-dll -shared -Wl,--subsystem,10 -e efi_main  -lgcc
 EFI_INCLUDES = -Isrc/include -Isrc/include/uefi -Isrc/include/uefi/X64 -Isrc/include/elf -Isrc/include/uefi/Protocol
 
 KERNEL_TARGETS = kernel log interrupt acpi pic graphics scheduler
-LIB_TARGETS = epstring mem math/math elf/relocation ../fs/ext2 io
+LIB_TARGETS = epstring mem math/math elf/relocation ../fs/ext2 io algorithm
 ASM_TARGETS = lib/asm/asm kernel/interrupt kernel/kernel lib/ipc/ipc
 
 #TODO:	ramdisk generator needs to be manually updated before adding new targets here
@@ -55,7 +55,7 @@ $(PROC_TARGETS):
 	@cp $(SRC_LOC)/proc/$@/bin/$@.elf $(SRC_LOC)/fs/Epoch-RAM-Disk-Generator/cmake-build-debug
 	@rm -f $(SRC_LOC)/fs/Epoch-RAM-Disk-Generator/cmake-build-debug/initrd.ext2
 	@cd $(SRC_LOC)/fs/Epoch-RAM-Disk-Generator/cmake-build-debug &&\
-	./Epoch_RAM_Disk_Generator.exe &&\
+	./Epoch_RAM_Disk_Generator &&\
 	cd ../../../../
 	@cp $(SRC_LOC)/fs/Epoch-RAM-Disk-Generator/cmake-build-debug/initrd.ext2 ./img
 
@@ -63,7 +63,7 @@ $(PROC_TARGETS):
 link:
 	@$(CC) $(LDFLAGS) ./obj/$(lastword $(subst /, ,*)).obj -o ./bin/$(NAME).elf
 	@echo "Compile finished: $(NAME).elf"
-	bash.exe bashscript.sh
+	bash bashscript.sh
 
 exec:
-	qemu-system-x86_64.exe -smp cores=4,threads=1,sockets=1 -m 8G -serial stdio -L OVMF/ -bios OVMF-pure-efi.fd -cdrom img/epochx64.iso
+	qemu-system-x86_64 -smp cores=4,threads=1,sockets=1 -m 8G -serial stdio -L OVMF/ -bios OVMF-pure-efi.fd -cdrom img/epochx64.iso

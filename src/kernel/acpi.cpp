@@ -131,36 +131,31 @@ void KeInitAPIC()
 
         UINT64 hpetPeriod  = *(UINT64*)(hpetAddress) >> 32;
         keSysDescriptor->hpetPeriod = hpetPeriod;
-        //kout << "[ HPET ] period in femptoseconds: " << DEC << hpetPeriod << "\n";
         printf("[ HPET ] period in femptoseconds: %u\n", hpetPeriod);
 
-        //  Enable HPET
+        /*  Enable HPET */
         *(UINT64*)(hpetAddress + 0x10) |= 1;
 
         UINT64 configHPET = *(UINT64*)(hpetAddress + 0x100);
         if(configHPET & (1<<4))
         {
-            //kout << "[ HPET ] Periodic mode supported\n";
             printf("[ HPET ] Periodic mode supported\n");
 
             if(configHPET & (1<<1))
                 printf("[ HPET ] Level triggered\\n");
-                //kout << "[ HPET ] Level triggered\n";
 
-            //  Enable periodic mode
+            /* Enable periodic mode */
             configHPET |= (1<<3) | (1<<6) & ~(1<<2);
 
-            //  Enable interrupts
+            /* Enable interrupts */
             //configHPET |= (1<<2);
         }
 
-        //  Write the config
+        /* Write the config */
         *(UINT64*)(hpetAddress + 0x100) = configHPET;
 
         //  Set comparator register
         //*(UINT64*)(hpetAddress + 0x108) = 0x2ffff;
-
-        //interrupt::nsPerTick = 0x2ffff*(double)hpetPeriod/1e6;
     }
 
     /*
@@ -190,7 +185,7 @@ void KeInitAPIC()
             if(Size == 0) break;
             Iterator += Size;
         }
-        //kout << DEC << "Found " << nCores << " logical processors\n";
+
         printf("[ CPU ] Found %u logical processors\n", nCores);
         keSysDescriptor->nCores = nCores;
 
@@ -240,22 +235,15 @@ void KeInitAPIC()
     }
 }
 
-void CalibrateAPIC(UINT64 frequency)
+void KeCalibrateAPICTimer(UINT64 frequency)
 {
-    using namespace log;
-    while(true)
+    KE_GET_TIME KeGetTime = keSysDescriptor->KeGetTime;
+    printf("[ APIC ] Calibrating timer\n");
+
+    /* Wait for 10 milliseconds */
+    KE_TIME initTime = KeGetTime();
+    while ((KeGetTime() - initTime) < 10e6)
     {
-        TTY_COORD oldCOORD = kout.GetPosition();
-
-        TTY_COORD timerCOORD;
-        timerCOORD.Lin = 5;
-        timerCOORD.Col = 70;
-        kout.SetPosition(timerCOORD);
-
-        UINT64 hpetCounter = *(UINT64*)(keSysDescriptor->pHPET + 0xF0);
-        log::kout << "[ HPET ] seconds: "<<DEC<<(UINT64)((double)hpetCounter*keSysDescriptor->hpetPeriod/1e15) << "\n";
-        kout.SetPosition(oldCOORD);
-
         asm volatile ("pause");
     }
 

@@ -125,8 +125,8 @@ int main()
      DWM_WINDOW_PROPERTIES properties = { 0 };
      properties.pStdout = (UINT64)getStdout();
      properties.pStdin = (UINT64)getStdin();
-     properties.height = 400;
-     properties.width = 600;
+     properties.height = 800;
+     properties.width = 1280;
      properties.state = WINDOW_STATE_FOCUED;
      properties.type = WINDOW_TYPE_TERMINAL;
      properties.KeyboardEventCallback = (void(*)(UINT8, void *))termKeyboardEventCallback;

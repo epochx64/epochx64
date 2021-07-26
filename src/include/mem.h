@@ -3,6 +3,7 @@
 
 #include <defs/int.h>
 #include <typedef.h>
+#include <ipc.h>
 
 #define memset64(buffer, length, value) for(UINT64 i = 0; i < (length); i+=8) *(UINT64*)((UINT64)(buffer) + i) = value
 #define memset32(buffer, length, value) for(UINT64 i = 0; i < length; i+=4) *(UINT32*)((UINT64)buffer + i) = value

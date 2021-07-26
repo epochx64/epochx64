@@ -125,6 +125,20 @@ namespace math
         if (Decimal < 0.5) return (T)RoundDown;
         else return (T)(RoundDown + 1);
     }
+
+    template <class T>
+    T max(T a, T b)
+    {
+        if (a > b) return a;
+        return b;
+    }
+
+    template <class T>
+    T min(T a, T b)
+    {
+        if (a < b) return a;
+        return b;
+    }
 }
 
 #endif
