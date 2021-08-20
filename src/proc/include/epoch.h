@@ -4,7 +4,6 @@
 #include <log.h>
 #include <asm/asm.h>
 #include <fs/ext2.h>
-#include <io.h>
 #include <window_common.h>
 
 extern KE_SYS_DESCRIPTOR *keSysDescriptor;
@@ -14,7 +13,9 @@ extern KE_SYS_DESCRIPTOR *keSysDescriptor;
  */
 extern KE_CREATE_PROCESS KeCreateProcess;
 extern KE_SCHEDULE_TASK KeScheduleTask;
-extern KE_SUSPEND_CURRENT_TASK KeSuspendCurrentTask;
+extern KE_SUSPEND_TASK KeSuspendTask;
+extern KE_GET_CURRENT_TASK_HANDLE KeGetCurrentTaskHandle;
+extern KE_RESUME_TASK KeResumeTask;
 extern KE_GET_TIME KeGetTime;
 
 /* DWM function list */

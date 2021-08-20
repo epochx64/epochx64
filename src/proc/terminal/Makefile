@@ -14,7 +14,7 @@ INCLUDES=-I ../../include -I../../kernel/include -I../include
 SRC_LOC=../..
 
 KERNEL_TARGETS = log graphics
-LIB_TARGETS = mem math/math elf/relocation ../fs/ext2 io
+LIB_TARGETS = mem math/math elf/relocation ../fs/ext2 io fault
 ASM_TARGETS = lib/asm/asm lib/ipc/ipc
 
 all: $(KERNEL_TARGETS) $(LIB_TARGETS) $(ASM_TARGETS) ../epoch $(NAME) link

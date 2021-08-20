@@ -1,4 +1,5 @@
 #include "dwm.h"
+#include <io.h>
 
 /**********************************************************************
  *  Local variables
@@ -117,7 +118,7 @@ void DwmInit()
     keSysDescriptor->pDwmDescriptor = (UINT64)&dwmDescriptor;
 
     /* Clear the double buffer */
-    memset64(dwmDescriptor.frameBufferInfo.pFrameBuffer, dwmDescriptor.frameBufferSize, 0);
+    memset64((void*)dwmDescriptor.frameBufferInfo.pFrameBuffer, dwmDescriptor.frameBufferSize, 0);
 
     /* Initialize timekeeping variables */
     currentTime = KeGetTime();
@@ -538,5 +539,5 @@ int main()
 
     /* The GFX routine thread is going to continue indefinitely, requiring data from this executable.
      * Suspending it prevents the data from being unallocated. */
-    KeSuspendCurrentTask();
+    KeSuspendTask(KeGetCurrentTaskHandle());
 }

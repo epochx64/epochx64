@@ -10,6 +10,7 @@
 #include <window_common.h>
 #include <font_rom.h>
 #include <ps2.h>
+#include <typedef.h>
 
 /**********************************************************************
  *  Definitions

@@ -93,7 +93,9 @@ typedef struct
 /* Kernel function list */
 typedef KE_HANDLE (*KE_CREATE_PROCESS)(PROCESS_PROPERTIES *properties);
 typedef KE_HANDLE (*KE_SCHEDULE_TASK)(UINT64 entry, KE_TIME startTime, UINT8 reschedule, KE_TIME periodNanoSeconds, UINT64 nArgs, ...);
-typedef void (*KE_SUSPEND_CURRENT_TASK)();
+typedef KE_HANDLE (*KE_GET_CURRENT_TASK_HANDLE)();
+typedef void (*KE_SUSPEND_TASK)(KE_HANDLE handle);
+typedef void (*KE_RESUME_TASK)(KE_HANDLE handle, KE_TIME resumeTime);
 typedef KE_TIME (*KE_GET_TIME)();
 
 typedef struct
@@ -133,7 +135,9 @@ typedef struct
     /* Kernel function list */
     KE_CREATE_PROCESS KeCreateProcess;
     KE_SCHEDULE_TASK KeScheduleTask;
-    KE_SUSPEND_CURRENT_TASK KeSuspendCurrentTask;
+    KE_GET_CURRENT_TASK_HANDLE KeGetCurrentTaskHandle;
+    KE_RESUME_TASK KeResumeTask;
+    KE_SUSPEND_TASK KeSuspendTask;
     KE_GET_TIME KeGetTime;
 
 } KE_SYS_DESCRIPTOR;

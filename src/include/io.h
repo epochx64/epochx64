@@ -7,10 +7,6 @@
 
 #include <defs/int.h>
 #include <stdarg.h>
-#include <epstring.h>
-#include <math/math.h>
-#include <math/conversion.h>
-#include <mem.h>
 #include <ipc.h>
 
 /**********************************************************************
@@ -18,9 +14,11 @@
  *********************************************************************/
 
 #define STDOUT_DEFAULT_SIZE 0x1000
+#define MAX_SPRINT_LEN 420
 
 typedef struct
 {
+    LOCK lock;              /* Lock used for thread safety */
     UINT64 size;            /* Size in bytes */
     UINT64 originOffset;    /* Offset of oldest data stored in the ring buffer */
     UINT64 offset;          /* Offset to newest data to append characters to */
@@ -29,6 +27,7 @@ typedef struct
 
 typedef struct
 {
+    LOCK lock;                  /* Lock used for thread safety */
     UINT64 size;                /* Size in bytes */
     UINT64 originOffset;        /* Offset of oldest data stored in the ring buffer */
     UINT64 offset;              /* Offset to newest data to append characters to */
@@ -54,7 +53,13 @@ void setStdin(STDIN *stdin);
 STDOUT *getStdout();
 STDIN *getStdin();
 void putchar(const char c, IOStreamID ID);
-void printf(const char *format, ...);
+void vprintf(char *format, va_list args);
+void printf(char *format, ...);
+void sprintf(char *dst, char *format, ...);
+void vsprintf(char *dst, char *format, va_list args);
 void scanf(const char *format, ...);
+
+void SerialOut(char *format, ...);
+void vSerialOut(char *format, va_list args);
 
 #endif

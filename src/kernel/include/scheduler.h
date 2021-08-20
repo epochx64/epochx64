@@ -10,13 +10,17 @@
 #include <mem.h>
 #include <log.h>
 #include <asm/asm.h>
+#include <math/math.h>
 #include <stdarg.h>
+#include <ipc.h>
+#include <algorithm.h>
+#include <io.h>
 
 /**********************************************************************
  *  Define macros
  *********************************************************************/
 
-#define STACK_SIZE 8192
+#define STACK_SIZE 4096
 
 /**********************************************************************
  *  Classes
@@ -26,6 +30,7 @@ class Task
 public:
     UINT64 pEntryPoint; /* Pointer to entry point */
     UINT64 pStack;      /* Pointer to the top of the stack */
+    UINT64 pStackUnaligned;
 
     UINT64 nArgs;       /* Number of arguments passed to the entrypoint */
     UINT64 args[6];     /* Array of argument values (pointer or integer) */
@@ -40,8 +45,9 @@ public:
 
     Task *nextActiveTask;           /* Pointer to next entry in linked list */
     KE_TASK_DESCRIPTOR *pTaskInfo;  /* Pointer to the task's KE_TASK_DESCRIPTOR */
+    UINT64 pTaskInfoUnaligned;
 
-    UINT64 ID;
+    KE_HANDLE handle;
     UINT64 priority;
 
     /**********************************************************************
@@ -81,48 +87,20 @@ class Scheduler
 {
 public:
     UINT64 nTasks;          /* Number of tasks the scheduler is currently using */
-    bool isLocked;          /* Should be set when scheduler structures are being edited */
     Task *currentTask;      /* Pointer to task that is currently being executed */
     Task *idleTask;         /* Pointer to idle task */
     Task *activeTaskList;   /* Linked list of tasks which are currently being executed by the scheduler */
     KE_TIME currentTime;    /* Stores the time elapsed since system startup in nanoseconds */
     PriorityQueue schedule; /* New tasks are first added here and sorted in the minheap based on start time. */
     UINT64 coreID;          /* New tasks are first added here and sorted in the minheap based on start time. */
+    LOCK schedulerLock;     /* Should be acquired when scheduler structures are being edited */
+    AvlTree TaskTree;       /* AVL tree of all tasks that are waiting to execute, or executing */
 
-    /**********************************************************************
-     *  @details Scheduler constructor
-     *  @param core - Core number that the scheduler is assigned to
-     *********************************************************************/
     Scheduler(UINT64 core);
-
-    /**********************************************************************
-     *  @details Adds a task to the priority queue
-     *  @param t - Task to add
-     *********************************************************************/
     void AddTask(Task *t);
-
-    /**********************************************************************
-     *  @details Called by the scheduler when a task completes
-     *  @param t - Task to add
-     *  @return Number of nanoseconds since system startup
-     *********************************************************************/
-    void RemoveCurrentTask();
-
-    /**********************************************************************
-     *  @details Called every APIC timer interrupt
-     *********************************************************************/
+    void PopFromActiveTaskList(Task *t);
+    void RescheduleTask(Task *t);
     void Tick();
-
-    /**********************************************************************
-     *  @details Adds a task to the scheduler with the least amount of tasks
-     *  @param t - Task to add
-     *********************************************************************/
-    static void ScheduleTask(Task *t);
-
-    /**********************************************************************
-     *  @details Gets time elapsed since system startup
-     *  @return Number of nanoseconds since system startup
-     *********************************************************************/
     static KE_TIME GetCurrentTime();
 };
 
@@ -133,7 +111,7 @@ public:
 /**********************************************************************
  *  @details Called immediately after a task finishes
  *********************************************************************/
-void ReturnFrame();
+void ReturnHandler();
 
 /**********************************************************************
  *  Global variables

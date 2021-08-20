@@ -6,19 +6,7 @@
  *********************************************************************/
 
 #include <defs/int.h>
-#include <asm/asm.h>
-#include <mem.h>
-#include <graphics.h>
-#include <interrupt.h>
-#include <acpi.h>
-#include <log.h>
 #include <boot/shared_boot_defs.h>
-#include <window_common.h>
-#include <fs/ext2.h>
-#include <process.h>
-#include <io.h>
-#include <elf/elf.h>
-#include <elf/relocation.h>
 
 /**********************************************************************
  *  Function declarations
@@ -64,6 +52,19 @@ KE_HANDLE KeScheduleTask(UINT64 entry, KE_TIME startTime, UINT8 reschedule, KE_T
 /**********************************************************************
  *  @details Stops executing the current thread until unsuspend
  *********************************************************************/
-void KeSuspendCurrentTask();
+void KeSuspendTask(KE_HANDLE handle);
+
+/**********************************************************************
+ *  @details Gets the handle of the currently executing thread
+ *  @param handle - Handle of the task
+ *********************************************************************/
+KE_HANDLE KeGetCurrentTaskHandle();
+
+/**********************************************************************
+ *  @details Resumes a previously suspended task
+ *  @param handle - Handle of the task to resume
+ *  @param resumeTime - Time to resume the task in KE_TIME
+ *********************************************************************/
+void KeResumeTask(KE_HANDLE handle, KE_TIME resumeTime);
 
 #endif

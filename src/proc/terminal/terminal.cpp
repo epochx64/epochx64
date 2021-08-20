@@ -4,6 +4,8 @@
 
 #include <epoch.h>
 #include <ps2.h>
+#include <io.h>
+#include <epstring.h>
 
 /**********************************************************************
  *  Local variables
@@ -121,20 +123,28 @@ static void termLoop()
 
 int main()
 {
-     /* Create the terminal window */
-     DWM_WINDOW_PROPERTIES properties = { 0 };
-     properties.pStdout = (UINT64)getStdout();
-     properties.pStdin = (UINT64)getStdin();
-     properties.height = 800;
-     properties.width = 1280;
-     properties.state = WINDOW_STATE_FOCUED;
-     properties.type = WINDOW_TYPE_TERMINAL;
-     properties.KeyboardEventCallback = (void(*)(UINT8, void *))termKeyboardEventCallback;
-     properties.x = 200;
-     properties.y = 100;
-     DwmCreateWindow(&properties);
-     printf("HELLO WORLD FROM TERMINAL.elf\n");
+    /* Create the terminal window */
+    DWM_WINDOW_PROPERTIES properties = { 0 };
+    properties.pStdout = (UINT64)getStdout();
+    properties.pStdin = (UINT64)getStdin();
+    properties.height = 800;
+    properties.width = 1280;
+    properties.state = WINDOW_STATE_FOCUED;
+    properties.type = WINDOW_TYPE_TERMINAL;
+    properties.KeyboardEventCallback = (void(*)(UINT8, void *))termKeyboardEventCallback;
+    properties.x = 200;
+    properties.y = 100;
+    DwmCreateWindow(&properties);
+    printf("HELLO WORLD FROM TERMINAL.elf");
 
-     //KeScheduleTask((UINT64)&testMsg, KeGetTime(), true, 0.5e9, 0);
-     //KeSuspendCurrentTask();
+    while (true)
+    {
+        char input[64] = { 0 };
+        printf("\ntype something > ");
+        scanf("%s", input);
+
+        if(input[1] == 'S') break;
+    }
+
+    printf("exiting teminal\n");
 }

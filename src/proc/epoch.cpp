@@ -1,4 +1,5 @@
 #include "include/epoch.h"
+#include <io.h>
 
 /**********************************************************************
  *  Externals
@@ -21,7 +22,9 @@ ext2::RAMDisk *keRamDisk;
 /* Kernel API function list */
 KE_CREATE_PROCESS KeCreateProcess;
 KE_SCHEDULE_TASK KeScheduleTask;
-KE_SUSPEND_CURRENT_TASK KeSuspendCurrentTask;
+KE_SUSPEND_TASK KeSuspendTask;
+KE_RESUME_TASK KeResumeTask;
+KE_GET_CURRENT_TASK_HANDLE KeGetCurrentTaskHandle;
 KE_GET_TIME KeGetTime;
 
 /* DWM function list */
@@ -35,7 +38,9 @@ void KeInitAPI()
 {
     KeCreateProcess = keSysDescriptor->KeCreateProcess;
     KeScheduleTask = keSysDescriptor->KeScheduleTask;
-    KeSuspendCurrentTask = keSysDescriptor->KeSuspendCurrentTask;
+    KeSuspendTask = keSysDescriptor->KeSuspendTask;
+    KeGetCurrentTaskHandle = keSysDescriptor->KeGetCurrentTaskHandle;
+    KeResumeTask = keSysDescriptor->KeResumeTask;
     KeGetTime = keSysDescriptor->KeGetTime;
 }
 
