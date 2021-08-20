@@ -1,4 +1,14 @@
 #include "kernel.h"
+#include <fs/ext2.h>
+#include <io.h>
+#include <elf/elf.h>
+#include <elf/relocation.h>
+#include <fault.h>
+#include <asm/asm.h>
+#include <mem.h>
+#include <interrupt.h>
+#include <acpi.h>
+#include <log.h>
 
 /**********************************************************************
  *  Global variables
@@ -20,11 +30,21 @@ void heapPrint()
 {
     auto heapIterator = heap::head;
 
+    printf("#################### BEGIN HEAP PRINTOUT #######################\n");
+
     while(heapIterator != nullptr)
     {
-        log::kout << "[ HEAP ] Free block size 0x"<<HEX<<heapIterator->size << " at 0x"<<HEX<<(UINT64)heapIterator << "\n";
+        printf("-------------------------------------------------------------\n"
+               "HEAP FREE BLOCK SIZE: %u\n"
+               "NEXT_FREE: 0x %16x\n"
+               "PREV_FREE: 0x %16x\n"
+               "-------------------------------------------------------------\n",
+               heapIterator->size, heapIterator->nextFree, heapIterator->prevFree, (UINT64)heapIterator);
+
         heapIterator = heapIterator->nextFree;
     }
+
+    printf("#################### END HEAP PRINTOUT #######################\n");
 }
 
 /**********************************************************************
@@ -54,10 +74,40 @@ void KeMain(KE_SYS_DESCRIPTOR *kernelInfo)
     log::kout.pFramebufferInfo = &(keSysDescriptor->gopInfo);
 
     /* Zero the sysmemory bitmap */
-    memset64(keSysDescriptor->pSysMemoryBitMap, keSysDescriptor->sysMemoryBitMapSize, 0);
+    memset64((void*)keSysDescriptor->pSysMemoryBitMap, keSysDescriptor->sysMemoryBitMapSize, 0);
 
     /* Set the blocks which store the SysMemory bitmap as occupied */
     KeSysMemBitmapSet(0, keSysDescriptor->sysMemoryBitMapSize/BLOCK_SIZE + 1);
+
+    /**************************************/
+
+   //AvlTree tree;
+   //KE_HANDLE counter = 0;
+   //KE_HANDLE handles[30];
+
+   //while(counter++ < 10)
+   //{
+   //    handles[counter] = counter;
+   //    tree.Insert((void *) counter, &handles[counter]);
+   //}
+
+   ////treePrintout(tree.root);
+
+   //tree.Remove(3);
+   ////treePrintout(tree.root);
+
+   //tree.Remove(1);
+   ////treePrintout(tree.root);
+   //tree.Remove(7);
+
+   //while(counter++ < 20)
+   //{
+   //    handles[counter] = counter;
+   //    tree.Insert((void *) counter, &(handles[counter]));
+   //}
+
+   //while(true);
+    /***************************************/
 
     /*
      * Setup IDT, PS/2 devices, PIT, and APIC timer
@@ -68,12 +118,12 @@ void KeMain(KE_SYS_DESCRIPTOR *kernelInfo)
     KeInitPS2();
     KeInitPIC();
     KeInitACPI();
+    sti();
 
-    //CalibrateAPIC(1e4);
+    KeCalibrateAPICTimer(1e4);
 
     double sysMemSize = (double)keSysDescriptor->sysMemorySize / 0x40000000;
-    //log::kout << "Free SysMemory: "<<DOUBLE_DEC << sysMemSize << "GiB\n";
-    printf("[ MEM ] Free system memory: %f GiB\n", sysMemSize);
+    printf("[ MEM ] System memory: %f GiB\n", sysMemSize);
     printf("HELLO 0x%04x\n", 0x4333);
 
     /* Initialize RAM disk */
@@ -96,8 +146,7 @@ void KeMain(KE_SYS_DESCRIPTOR *kernelInfo)
     properties.noWindow = false;
     KeCreateProcess(&properties);
 
-    /* Start interrupts and make the CPU idle (this is now the idle task for scheduler 0) */
-    sti();
+    /* Make the CPU idle (this is now the idle task for scheduler 0) */
     hlt();
 }
 
@@ -109,7 +158,9 @@ void KeInitAPI()
 {
     keSysDescriptor->KeCreateProcess = &KeCreateProcess;
     keSysDescriptor->KeScheduleTask = &KeScheduleTask;
-    keSysDescriptor->KeSuspendCurrentTask = &KeSuspendCurrentTask;
+    keSysDescriptor->KeSuspendTask = &KeSuspendTask;
+    keSysDescriptor->KeResumeTask = &KeResumeTask;
+    keSysDescriptor->KeGetCurrentTaskHandle = &KeGetCurrentTaskHandle;
     keSysDescriptor->KeGetTime = &KeGetTime;
 }
 
@@ -130,8 +181,20 @@ KE_HANDLE KeScheduleTask(UINT64 entry, KE_TIME startTime, UINT8 reschedule, KE_T
     Task *task = new Task(entry, startTime, reschedule, periodNanoSeconds, nArgs, argList);
     va_end(argList);
 
-    Scheduler::ScheduleTask(task);
-    return task->ID;
+    /* Find a scheduler to insert the task into */
+    UINT64 chosenOne = 0;
+    for(UINT64 i = 1; i < keSysDescriptor->nCores; i++)
+    {
+        if (keSchedulers[chosenOne]->nTasks > keSchedulers[i]->nTasks)
+            chosenOne = i;
+    }
+
+    AcquireLock(&keSchedulers[chosenOne]->schedulerLock);
+    keSchedulers[chosenOne]->TaskTree.Insert(task, &task->handle);
+    keSchedulers[chosenOne]->AddTask(task);
+    ReleaseLock(&keSchedulers[chosenOne]->schedulerLock);
+
+    return task->handle;
 }
 
 /**********************************************************************
@@ -160,9 +223,10 @@ KE_HANDLE KeCreateProcess(PROCESS_PROPERTIES *properties)
             properties->startTime,
             properties->reschedule,
             properties->periodNanoSeconds,
-            3,
+            4,
             keSysDescriptor,
             properties->pStdout,
+            properties->pStdin,
             properties->noWindow
             );
 
@@ -170,26 +234,78 @@ KE_HANDLE KeCreateProcess(PROCESS_PROPERTIES *properties)
 }
 
 /**********************************************************************
- *  @details Stops executing the current thread until unsuspend
+ *  @details Gets the handle of the currently executing thread
+ *  @param handle - Handle of the task
  *********************************************************************/
-void KeSuspendCurrentTask()
+KE_HANDLE KeGetCurrentTaskHandle()
 {
     UINT64 coreID = APICID();
     auto scheduler = keSchedulers[coreID];
-    auto currentTask = scheduler->currentTask;
+
+    return scheduler->currentTask->handle;
+}
+
+/**********************************************************************
+ *  @details Stops executing the current thread until unsuspend
+ *  @param handle - Handle of the task
+ *********************************************************************/
+void KeSuspendTask(KE_HANDLE handle)
+{
+    UINT64 coreID = APICID();
+    Scheduler *scheduler = keSchedulers[coreID];
 
     /* Lock the scheduler to prevent it from accessing the structure we're about to edit */
-    scheduler->isLocked = true;
+    AcquireLock(&scheduler->schedulerLock);
+
+    /* Get the task object */
+    auto task = (Task*)scheduler->TaskTree.Search(handle);
+    FaultLogAssertSerial(task, "Could not find task with handle %u\n", handle);
 
     /* Signal to the scheduler that the task is completed */
-    currentTask->ended = true;
-    currentTask->suspended = true;
+    task->ended = true;
+    task->suspended = true;
 
     /* Unlock the scheduler */
-    scheduler->isLocked = false;
+    ReleaseLock(&scheduler->schedulerLock);
 
-    /* Wait for the scheduler tick */
-    hlt();
+    /* Invoke the APIC timer interrupt, repeating if the scheduler is locked */
+    while (true)
+    {
+        asm volatile("int $48");
+        asm volatile("pause");
+
+        /* If the task has resumed, break out of this loop */
+        if (!task->ended)
+        {
+            break;
+        }
+    }
+}
+
+/**********************************************************************
+ *  @details Resumes a previously suspended task
+ *  @param handle - Handle of the task to resume
+ *  @param resumeTime - Time to resume the task in KE_TIME
+ *********************************************************************/
+void KeResumeTask(KE_HANDLE handle, KE_TIME resumeTime)
+{
+    UINT64 coreID = APICID();
+    Scheduler *scheduler = keSchedulers[coreID];
+
+    /* Lock the scheduler to prevent it from accessing the structure we're about to edit */
+    AcquireLock(&scheduler->schedulerLock);
+
+    /* Get the task object */
+    auto task = (Task*)scheduler->TaskTree.Search(handle);
+    FaultLogAssertSerial(task, "Could not find task with handle %u\n", handle);
+
+    task->ended = false;
+    task->suspended = false;
+    task->startTime = resumeTime;
+    scheduler->AddTask(task);
+
+    /* Unlock the scheduler */
+    ReleaseLock(&scheduler->schedulerLock);
 }
 
 /**********************************************************************

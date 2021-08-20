@@ -1,4 +1,6 @@
 #include "mem.h"
+#include <io.h>
+#include <fault.h>
 
 void* operator new ( size_t count ){ return heap::malloc(count); }
 void* operator new[] ( size_t count ) { return heap::malloc(count); }
@@ -8,17 +10,19 @@ void operator delete[] (void* ptr) { heap::free(ptr); }
 
 namespace heap
 {
-    // 2MB page-aligned heap
-    UINT8 __attribute__((aligned(4096))) pHeap[0x200000];
+    // 32MiB page-aligned heap
+    UINT8 __attribute__((aligned(4096))) pHeap[0x2000000];
 
     // Size of heap in bytes
-    UINT64 heapSize = 0x200000;
+    UINT64 heapSize = 0x2000000;
 
     // Number of occupied bytes in the heap
     UINT64 occupiedBytes = 0;
 
     // Pointer to first free BLOCK_HDR
     BLOCK_HDR *head = (BLOCK_HDR *) pHeap;
+
+    LOCK heapLock = LOCK_STATUS_FREE;
 
     /// Must be called only once, before using the malloc/free functions
     void init()
@@ -53,7 +57,7 @@ namespace heap
         newBlock->nextFree = block->nextFree;
         newBlock->size = block->size - size - sizeof(BLOCK_HDR);
 
-        block->size -= newBlock->size + sizeof(BLOCK_HDR);
+        block->size = size;
 
         if(block == head) head = newBlock;
 
@@ -62,48 +66,38 @@ namespace heap
         if(block->nextFree) block->nextFree->prevFree = newBlock;
     }
 
-    /// Takes two blocks and merges them into one free block (preserving the LEFT block)
-    /// \param left Left block in either free or occupied state
-    /// \param right Right block in either free or occupied state
-    /// \param rightState true if right is occupied, false if right is free
-    void merge(BLOCK_HDR *left, BLOCK_HDR *right, bool rightState)
-    {
-        if(!rightState)
-        {
-            left->nextFree = right->nextFree;
-
-            if(right->nextFree)
-                right->nextFree->prevFree = left;
-
-            if(left->prevFree)
-                left->prevFree->nextFree = left;
-        }
-
-        left->size += right->size + sizeof(BLOCK_HDR);
-    }
-
     /// Default heap memory allocator
     /// \param size Number of bytes to allocate
     /// \return
     void *malloc(UINT64 size)
     {
+        AcquireLock(&heapLock);
+
         // TODO: Track RAM usage
         auto heapIterator = head;
 
         // Drill down the linked-list until a large enough block is found
-        while(heapIterator != nullptr && size > heapIterator->size)
+        while(heapIterator != nullptr && heapIterator->size < size)
             heapIterator = heapIterator->nextFree;
 
         // No more free blocks
-        if(heapIterator == nullptr) return nullptr;
+        if(heapIterator == nullptr)
+        {
+            ReleaseLock(&heapLock);
+            return nullptr;
+        }
 
         // If the found block is perfectly sized, allocate the whole block
         // Otherwise, the extra free space should be converted into a new block
-        if(heapIterator->size <= size + sizeof(BLOCK_HDR)) allocFull(heapIterator);
+        if(heapIterator->size <= (size + sizeof(BLOCK_HDR))) allocFull(heapIterator);
         else allocPartial(heapIterator, size);
 
-        heapIterator->nextFree = nullptr;
-        heapIterator->prevFree = nullptr;
+        //heapIterator->nextFree = nullptr;
+        //heapIterator->prevFree = nullptr;
+
+        //SerialOut("allocating 0x%16x with size %u\n", (UINT64)heapIterator + sizeof(BLOCK_HDR), size);
+
+        ReleaseLock(&heapLock);
 
         return (void*)((UINT64)heapIterator + sizeof(BLOCK_HDR));
     }
@@ -112,8 +106,14 @@ namespace heap
     /// \param ptr
     void free(void *ptr)
     {
+        AcquireLock(&heapLock);
+
+        FaultLogAssertSerial(ptr, "ptr is NULL\n");
+
         auto block = (BLOCK_HDR*)((UINT64)ptr - sizeof(BLOCK_HDR));
         auto heapIterator = head;
+
+        //SerialOut("DEallocating 0x%16x with size %u\n", (UINT64)ptr, block->size);
 
         // Drill down the linked-list until we reach the next & previous free nodes to block
         while(heapIterator->nextFree != nullptr && (UINT64)heapIterator->nextFree < (UINT64)block)
@@ -138,29 +138,40 @@ namespace heap
         {
             if(left) left->nextFree = block;
             if(right) right->prevFree = block;
+
+            ReleaseLock(&heapLock);
             return;
         }
 
         // If adjacent to a free block on the left, combine the two blocks
         if (left && ADJACENT(left, block))
         {
-            merge(left, block, true);
-            block = left;
+            // Enlarge left block, nothing else required
+            left->size += block->size + sizeof(BLOCK_HDR);
+
+            // Another merge is possible
+            if (right && ADJACENT(left, right))
+            {
+                left->nextFree = right->nextFree;
+                if (right->nextFree) right->nextFree->prevFree = left;
+
+                left->size += right->size + sizeof(BLOCK_HDR);
+            }
+        }
+        // If adjacent to a free block on the right
+        else if (right && ADJACENT(block, right))
+        {
+            // Set pointers
+            block->prevFree = right->prevFree;
+            block->nextFree = right->nextFree;
+            if (right->prevFree) right->prevFree->nextFree = block;
+            if (right->nextFree) right->nextFree->prevFree = block;
+
+            // Increase size
+            block->size += right->size + sizeof(BLOCK_HDR);
         }
 
-        // If adjacent to a free block on the right, combine
-        if(right && ADJACENT(block, right))
-            merge(block, right, false);
-    }
-
-    void *MallocAligned(UINT64 Size, UINT64 Align)
-    {
-        Size += Align - 1;
-        auto Return = (UINT64)malloc(Size);
-
-        for(; (Return % Align) != 0; Return++);
-
-        return (void *)Return;
+        ReleaseLock(&heapLock);
     }
 }
 
@@ -168,16 +179,16 @@ void KeSysMemBitmapSet(UINT64 BlockID, UINT64 nBlocks)
 {
     UINT64 SetBlocks = 0;
 
-    for(auto BitMapIter = (UINT8*)(keSysDescriptor->pSysMemoryBitMap + (BlockID/8));
+    for(auto BitMapIter = (UINT64*)(keSysDescriptor->pSysMemoryBitMap + 8*(BlockID/64));
         (UINT64)BitMapIter < (UINT64)(keSysDescriptor->pSysMemoryBitMap + keSysDescriptor->sysMemoryBitMapSize);
         BitMapIter++)
     {
-        for (UINT8 Mask = 1, i = 0; i < 8; Mask <<= 1, i++)
+        for (UINT64 Mask = 1, i = 0; i < 64; Mask <<= 1, i++)
         {
             if(SetBlocks == 0)
             {
-                Mask <<= (BlockID % 8);
-                i += (BlockID % 8);
+                Mask <<= (BlockID % 64);
+                i += (BlockID % 64);
             }
 
             *BitMapIter |= Mask;
@@ -187,12 +198,14 @@ void KeSysMemBitmapSet(UINT64 BlockID, UINT64 nBlocks)
     }
 }
 
+#define SYS_MEM_BLOCK_SIZE 0x100000
+
 void *KeSysMalloc(UINT64 Size)
 {
     /*
      * TODO: Locking should be implemented ASAP
      */
-    UINT64 nBlocks = Size/4096 + 1;
+    UINT64 nBlocks = Size/SYS_MEM_BLOCK_SIZE + 1;
 
     UINT64 BlockID = 0;
     UINT64 nFoundBlocks = 0;
@@ -200,15 +213,17 @@ void *KeSysMalloc(UINT64 Size)
     /*
      * Run through the bitmap to find a contiguous chunk of memory
      */
-    for(auto BitMapIter = (UINT8*)(keSysDescriptor->pSysMemoryBitMap);
+    for(auto BitMapIter = (UINT64*)(keSysDescriptor->pSysMemoryBitMap);
         (UINT64)BitMapIter < (UINT64)(keSysDescriptor->pSysMemoryBitMap + keSysDescriptor->sysMemoryBitMapSize);
         BitMapIter++)
     {
-        for (UINT8 Mask = 1, i = 0; i < 8; Mask <<= 1, i++)
+        UINT64 bitmapChunk = *BitMapIter;
+
+        for (UINT64 Mask = 1, i = 0; i < 64; Mask <<= 1, i++)
         {
             BlockID++;
 
-            if(*BitMapIter & Mask)
+            if(bitmapChunk & Mask)
             {
                 nFoundBlocks = 0;
                 continue;
@@ -217,7 +232,7 @@ void *KeSysMalloc(UINT64 Size)
             if(++nFoundBlocks >= nBlocks)
             {
                 KeSysMemBitmapSet(BlockID - nBlocks, nBlocks);
-                return (void*)(keSysDescriptor->pSysMemory + (BlockID - nBlocks)*4096);
+                return (void*)(keSysDescriptor->pSysMemory + (BlockID - nBlocks)*SYS_MEM_BLOCK_SIZE);
             }
         }
     }

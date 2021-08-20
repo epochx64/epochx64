@@ -22,15 +22,14 @@ KE_TASK_DESCRIPTOR **keTasks;
 Scheduler::Scheduler(UINT64 core)
 {
     /* Initialize member variables */
-    isLocked = false;
     coreID = core;
     nTasks = 1;
+    schedulerLock = LOCK_STATUS_FREE;
 
     /* Initialize idle task */
     va_list args{};
     currentTask = new Task(0, 0, false, 0, 0, args);
 
-    currentTask->ID = 0;
     idleTask = currentTask;
     schedule.heap[0] = idleTask;
 
@@ -57,22 +56,18 @@ KE_TIME Scheduler::GetCurrentTime()
 void Scheduler::AddTask(Task *t)
 {
     schedule.Insert(t);
-    nTasks++;
 }
 
 /**********************************************************************
- *  @details Called by the scheduler when a task completes
- *  @param t - Task to add
- *  @return Number of nanoseconds since system startup
+ *  @details Removes the task t from the active task linked list
+ *  @param t - Task to remove
  *********************************************************************/
-void Scheduler::RemoveCurrentTask()
+void Scheduler::PopFromActiveTaskList(Task *t)
 {
-    //TODO: Make this less ugly with helper functions, or use a linked list class
-
     /* Traverse the linked list to get the previous element before currentTask */
     Task *currentTaskIter = activeTaskList;
     Task *currentTaskIterPrev = nullptr;
-    while(currentTaskIter != nullptr && currentTaskIter != currentTask)
+    while(currentTaskIter != nullptr && currentTaskIter != t)
     {
         currentTaskIterPrev = currentTaskIter;
         currentTaskIter = currentTaskIter->nextActiveTask;
@@ -89,59 +84,40 @@ void Scheduler::RemoveCurrentTask()
         /* Remove task */
         currentTaskIterPrev->nextActiveTask = currentTaskIter->nextActiveTask;
     }
+}
 
-    /* Idle if there are no tasks to perform */
-    if(activeTaskList == nullptr)
-    {
-        activeTaskList = idleTask;
-    }
-
-    /* If the task has been suspended */
-    if (currentTask->suspended)
-    {
-        currentTask = activeTaskList;
-        return;
-    }
-
-    /* If the current task is not meant to repeat */
-    if(!currentTask->reschedule)
-    {
-        nTasks--;
-        currentTask = activeTaskList;
-        /* TODO: Add a destructor for tasks */
-        //delete currentTask;
-
-        return;
-    }
-
-    /* Reset member variables of the current task */
-    currentTask->ended = false;
-
+/**********************************************************************
+ *  @details Reschedules task t based on its period
+ *  @param t - Task to reschedule
+ *********************************************************************/
+void Scheduler::RescheduleTask(Task *t)
+{
     /* If the task took longer to execute than its period */
-    if(currentTime > currentTask->startTime + currentTask->periodNanoSeconds)
+    if(currentTime > (t->startTime + t->periodNanoSeconds))
     {
         /* Reschedule immediately */
-        currentTask->startTime = currentTime;
+        t->startTime = currentTime;
     }
     else
     {
         /* Reschedule after one period has elapsed since previous call */
-        currentTask->startTime += currentTask->periodNanoSeconds;
+        t->startTime += currentTask->periodNanoSeconds;
     }
 
-    /* Reset registers of the current task */
-    *(UINT64*)currentTask->pStack = (UINT64)&ReturnFrame;
-    currentTask->pTaskInfo->rsp = currentTask->pStack;
-    currentTask->pTaskInfo->rbp = currentTask->pStack;
-    currentTask->pTaskInfo->rdi = (UINT64)currentTask->args;
-    currentTask->pTaskInfo->IRETQCS = 0x08;
-    currentTask->pTaskInfo->IRETQRFLAGS = 0x202;
-    currentTask->pTaskInfo->IRETQRIP = currentTask->pEntryPoint;
+    /* Reset member variables and registers of the current task */
+    t->ended = false;
+    t->pTaskInfo->rsp = t->pStack;
+    t->pTaskInfo->rbp = t->pStack;
+    t->pTaskInfo->rdi = (UINT64)t->args;
+    t->pTaskInfo->IRETQCS = 0x08;
+    t->pTaskInfo->IRETQRFLAGS = 0x202;
+    t->pTaskInfo->IRETQRIP = t->pEntryPoint;
+
+    /* Write the return-address of the task to a special handler */
+    *(UINT64*)t->pStack = (UINT64)&ReturnHandler;
 
     /* Reschedule the task */
-    AddTask(currentTask);
-
-    currentTask = activeTaskList;
+    AddTask(t);
 }
 
 /**********************************************************************
@@ -153,14 +129,47 @@ void Scheduler::Tick()
     currentTime = GetCurrentTime();
 
     /* If a task is currently editing the scheduler return to the task and let it finish */
-    if(isLocked) return;
+    if (LOCK_STATUS_LOCKED == schedulerLock)
+    {
+        return;
+    }
+
+    AcquireLock(&schedulerLock);
 
     /* If the current task is finished, remove/reschedule it */
-    if(currentTask->ended) RemoveCurrentTask();
+    if(currentTask->ended)
+    {
+        /* Remove the current task from the active task list */
+        PopFromActiveTaskList(currentTask);
+        nTasks--;
+
+        /* Idle if there are no tasks to perform */
+        if(activeTaskList == nullptr)
+        {
+            activeTaskList = idleTask;
+        }
+
+        /* If need be, reschedule the task */
+        if (currentTask->reschedule)
+        {
+            RescheduleTask(currentTask);
+        }
+        else
+        {
+            /* Do not destroy object if the task is just being suspended */
+            if (!currentTask->suspended)
+            {
+                TaskTree.Remove(currentTask->handle);
+                delete currentTask;
+            }
+        }
+    }
 
     /* Check the priority queue for any tasks that need to start executing */
     while ( (schedule.size >= 1) && (schedule.heap[1]->startTime <= currentTime) )
     {
+        nTasks++;
+
         /* Remove task from top of priority queue */
         Task *newActiveTask = schedule.Deque();
 
@@ -172,53 +181,42 @@ void Scheduler::Tick()
         activeTaskList = newActiveTask;
     }
 
+    /* Start executing tasks starting from top of active task list */
+    currentTask = activeTaskList;
+
     /* If the current active task is at the end of the list, go back to beginning of the list */
     if(currentTask->nextActiveTask == nullptr) currentTask = activeTaskList;
     else currentTask = currentTask->nextActiveTask;
 
     /* Set current task in the global task structure */
     keTasks[coreID] = currentTask->pTaskInfo;
-}
 
-/**********************************************************************
- *  @details Adds a task to the scheduler with the least amount of tasks
- *  @param t - Task to add
- *********************************************************************/
-void Scheduler::ScheduleTask(Task *t)
-{
-    UINT64 chosenOne = 0;
-
-    for(UINT64 i = 1; i < keSysDescriptor->nCores; i++)
-    {
-        if (keSchedulers[chosenOne]->nTasks > keSchedulers[i]->nTasks)
-            chosenOne = i;
-    }
-
-    keSchedulers[chosenOne]->isLocked = true;
-    keSchedulers[chosenOne]->AddTask(t);
-    keSchedulers[chosenOne]->isLocked = false;
+    ReleaseLock(&schedulerLock);
 }
 
 /**********************************************************************
  *  @details Called immediately after a task finishes
  *********************************************************************/
-void ReturnFrame()
+void ReturnHandler()
 {
     UINT64 coreID = APICID();
     auto scheduler = keSchedulers[coreID];
     auto currentTask = scheduler->currentTask;
 
     /* Lock the scheduler to prevent it from accessing the structure we're about to edit */
-    scheduler->isLocked = true;
+    AcquireLock(&scheduler->schedulerLock);
 
-    /* Signal to the scheduler that the task is completed */
     currentTask->ended = true;
 
     /* Unlock the scheduler */
-    scheduler->isLocked = false;
+    ReleaseLock(&scheduler->schedulerLock);
 
-    /* Wait for the scheduler tick */
-    hlt();
+    /* Invoke the APIC timer interrupt, repeating if the scheduler is locked */
+    while (true)
+    {
+        asm volatile("int $48");
+        asm volatile("pause");
+    }
 }
 
 /**********************************************************************
@@ -232,6 +230,9 @@ void ReturnFrame()
  *********************************************************************/
 Task::Task(UINT64 entry, KE_TIME startTime, bool reschedule, KE_TIME periodNanoSeconds, UINT64 nArgs, va_list args)
 {
+    static UINT64 handleCounter = 0;
+    static LOCK handleCounterLock = LOCK_STATUS_FREE;
+
     /* Initialize member variables */
     this->reschedule = reschedule;
     this->startTime = startTime;
@@ -241,12 +242,24 @@ Task::Task(UINT64 entry, KE_TIME startTime, bool reschedule, KE_TIME periodNanoS
     this->ended = false;
     this->suspended = false;
 
-    this->pTaskInfo   = (KE_TASK_DESCRIPTOR*)KeSysMalloc(sizeof(KE_TASK_DESCRIPTOR));
-    this->pStack      = (UINT64)KeSysMalloc(STACK_SIZE + 1) + STACK_SIZE;
+    /* Ensure mutual exclusion for thread safety */
+    AcquireLock(&handleCounterLock);
+    this->handle = ++handleCounter;
+    ReleaseLock(&handleCounterLock);
+
+    /* Allocate 16-byte aligned stack */
+    this->pStackUnaligned = (UINT64)heap::malloc(STACK_SIZE + 8 + 0x10);
+    this->pStack = this->pStackUnaligned + STACK_SIZE;
+    if (this->pStack & 0x0F) this->pStack = (this->pStack + 0x10) & 0xFFFFFFFFFFFFFFF0ULL;
+
+    /* Allocate 16-byte aligned task descriptor */
+    this->pTaskInfoUnaligned = (UINT64)heap::malloc(sizeof(KE_TASK_DESCRIPTOR) + 0x10);
+    this->pTaskInfo = (KE_TASK_DESCRIPTOR *)this->pTaskInfoUnaligned;
+    if ((UINT64)this->pTaskInfo & 0x0F)
+        this->pTaskInfo = (KE_TASK_DESCRIPTOR*)(((UINT64)this->pTaskInfo + 0x10) & 0xFFFFFFFFFFFFFFF0ULL);
 
     /* Zero out the newly allocated KE_TASK_DESCRIPTOR */
-    for(UINT64 i = 0; i < sizeof(KE_TASK_DESCRIPTOR); i+=8)
-        *(UINT64*)((UINT64)pTaskInfo + i) = 0;
+    memset64(pTaskInfo, sizeof(KE_TASK_DESCRIPTOR), 0);
 
     /* SYS-V ABI argument arrangement */
     UINT64 *taskArguments[6] = {
@@ -265,7 +278,7 @@ Task::Task(UINT64 entry, KE_TIME startTime, bool reschedule, KE_TIME periodNanoS
     }
 
     /* Set other registers */
-    *(UINT64*)pStack = (UINT64)&ReturnFrame;
+    *(UINT64*)pStack = (UINT64)&ReturnHandler;
     pTaskInfo->rsp = pStack;
     pTaskInfo->rbp = pStack;
     pTaskInfo->IRETQCS = 0x08;
@@ -282,7 +295,8 @@ Task::Task(UINT64 entry, KE_TIME startTime, bool reschedule, KE_TIME periodNanoS
  *********************************************************************/
 Task::~Task()
 {
-
+    delete (UINT8*)pStackUnaligned;
+    delete (UINT8*)pTaskInfoUnaligned;
 }
 
 /**********************************************************************
