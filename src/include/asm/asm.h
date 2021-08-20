@@ -10,34 +10,45 @@ typedef UINT16    WORD;
 typedef UINT32    DWORD;
 typedef UINT64    QWORD;
 
-extern "C" void nop();
-
-extern "C" BYTE inb(WORD port);
-extern "C" void outb(WORD port, BYTE val);
-
-extern "C" void sti();
-extern "C" void cli();
-extern "C" void hlt();
-
-extern "C" void lgdt();
-extern "C" void lidt();
-
-extern "C" void cpuid(UINT64 *rax, UINT64 *rbx, UINT64 *rcx, UINT64 *rdx);
-extern "C" void ReadMSR(UINT64 MSRID, UINT64 *MSRValue);
-extern "C" void SetMSR(UINT64 MSRID, UINT64 MSRValue);
-extern "C" void IOWait();
-
-extern "C" void ReadRFLAGS(UINT64 *RFLAGS);
-extern "C" void EnableSSE(void *pSSEINFO);
-
-extern "C" void APBootstrap();
-
-extern "C" void GetCR3Value(UINT64 *Value);
 extern "C" UINT32 CR3Value;
 
-extern "C" UINT64 APICID();
+extern "C"
+{
+    void nop();
 
-extern "C" void SetRSP(UINT64 RSP);
+    BYTE inb(WORD port);
+    void outb(WORD port, BYTE val);
+
+    void sti();
+    void cli();
+    void hlt();
+
+    void lgdt();
+    void lidt();
+
+    void cpuid(UINT64 *rax, UINT64 *rbx, UINT64 *rcx, UINT64 *rdx);
+    void ReadMSR(UINT64 MSRID, UINT64 *MSRValue);
+    void SetMSR(UINT64 MSRID, UINT64 MSRValue);
+    void IOWait();
+
+    void ReadRFLAGS(UINT64 *RFLAGS);
+    void EnableSSE(void *pSSEINFO);
+
+    void APBootstrap();
+
+    void GetCR3Value(UINT64 *Value);
+
+    UINT64 APICID();
+
+    void SetRSP(UINT64 RSP);
+    UINT64 GetRSP();
+
+    void memset128(void *dest, UINT64 size, __uint128_t value);
+    void memset64(void *dest, UINT64 size, UINT64 value);
+    void memset32(void *dest, UINT64 size, UINT32 value);
+    void memset16(void *dest, UINT64 size, UINT16 value);
+    void memset8(void *dest, UINT64 size, UINT8 value);
+}
 
 
 

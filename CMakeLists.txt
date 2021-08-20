@@ -36,6 +36,9 @@ add_executable(epochx64 src/boot/boot.c
         src/kernel/include/pic.h
         src/include/window_common.h
         src/lib/io.cpp
-        src/include/ps2.h src/lib/ipc/ipc.cpp src/include/ipc.h)
+        src/include/ps2.h
+        src/include/ipc.h
+        src/lib/algorithm.cpp
+        src/include/algorithm.h src/lib/fault.cpp src/include/fault.h)
 
 target_include_directories(epochx64 PUBLIC src src/include src/kernel/include src/include/elf src/include/uefi src/include/uefi/X64 src/include/uefi/Protocol)

@@ -188,6 +188,11 @@ SetRSP:
 
     ret
 
+    global GetRSP
+GetRSP:
+    mov rax, rsp
+    ret
+
 ;   Sets up floating point math
     global EnableSSE
 EnableSSE:
@@ -262,3 +267,40 @@ outb:
     pop rdx
 
     ret
+
+    global memset128
+memset128:
+
+    ret
+
+    global memset64
+memset64:
+    mov rcx, rsi
+    mov rax, rdx
+    shr rcx, 3
+    rep stosq
+    ret
+
+    global memset32
+memset32:
+    mov rcx, rsi
+    mov rax, rdx
+    shr rcx, 2
+    rep stosd
+    ret
+
+    global memset16
+memset16:
+    mov rcx, rsi
+    mov rax, rdx
+    shr rcx, 1
+    rep stosw
+    ret
+
+    global memset8
+memset8:
+    mov rcx, rsi
+    mov rax, rdx
+    rep stosb
+    ret
+

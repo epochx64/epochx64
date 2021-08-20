@@ -4,11 +4,7 @@
 #include <defs/int.h>
 #include <typedef.h>
 #include <ipc.h>
-
-#define memset64(buffer, length, value) for(UINT64 i = 0; i < (length); i+=8) *(UINT64*)((UINT64)(buffer) + i) = value
-#define memset32(buffer, length, value) for(UINT64 i = 0; i < length; i+=4) *(UINT32*)((UINT64)buffer + i) = value
-#define memset16(buffer, length, value) for(UINT64 i = 0; i < length; i+=2) *(UINT16*)((UINT64)buffer + i) = value
-#define memset8(buffer, length, value) for(UINT64 i = 0; i < length; i++) *(UINT8*)((UINT64)buffer + i) = value
+#include <asm/asm.h>
 
 typedef uint8_t byte;
 
@@ -63,12 +59,6 @@ namespace heap
 
     void free(void *ptr);
     void *malloc(UINT64 size);
-
-    /*
-     * malloc function but with align
-     * Strongly advised to not use because you cannot free() this yet
-     */
-    void *MallocAligned(UINT64 Size, UINT64 Align);
 }
 
 #endif
