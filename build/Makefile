@@ -1,8 +1,8 @@
 NAME = epochx64
 
 # For compiling the kernel
-INCLUDES=-Isrc/include -Isrc/kernel/include
-SRC_LOC=./src
+INCLUDES=-I../src/include -I../src/kernel/include
+SRC_LOC=../src
 
 CXX = x86_64-elf-g++
 
@@ -18,10 +18,10 @@ NASMFLAGS = -felf64
 EFI_C = x86_64-w64-mingw32-gcc
 EFI_CFLAGS = -ffreestanding
 EFI_LINKFLAGS = -nostdlib -Wl,-dll -shared -Wl,--subsystem,10 -e efi_main  -lgcc
-EFI_INCLUDES = -Isrc/include -Isrc/include/uefi -Isrc/include/uefi/X64 -Isrc/include/elf -Isrc/include/uefi/Protocol
+EFI_INCLUDES = -I../src/include -I../src/include/uefi -I../src/include/uefi/X64 -I../src/include/elf -I../src/include/uefi/Protocol
 
 KERNEL_TARGETS = kernel log interrupt acpi pic graphics scheduler
-LIB_TARGETS = epstring mem math/math elf/relocation ../fs/ext2 io algorithm
+LIB_TARGETS = epstring mem math/math elf/relocation ../fs/ext2 io algorithm fault
 ASM_TARGETS = lib/asm/asm kernel/interrupt kernel/kernel lib/ipc/ipc
 
 #TODO:	ramdisk generator needs to be manually updated before adding new targets here
