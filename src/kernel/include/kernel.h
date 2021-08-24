@@ -50,9 +50,15 @@ KE_TIME KeGetTime();
 KE_HANDLE KeScheduleTask(UINT64 entry, KE_TIME startTime, UINT8 reschedule, KE_TIME periodNanoSeconds, UINT64 nArgs, ...);
 
 /**********************************************************************
- *  @details Stops executing the current thread until unsuspend
+ *  @details Stops executing the specified thread until unsuspend
+ *  @param handle - Handle of the task
  *********************************************************************/
 void KeSuspendTask(KE_HANDLE handle);
+
+/**********************************************************************
+ *  @details Stops executing the current thread until unsuspend
+ *********************************************************************/
+void KeSuspendCurrentTask();
 
 /**********************************************************************
  *  @details Gets the handle of the currently executing thread
@@ -66,5 +72,18 @@ KE_HANDLE KeGetCurrentTaskHandle();
  *  @param resumeTime - Time to resume the task in KE_TIME
  *********************************************************************/
 void KeResumeTask(KE_HANDLE handle, KE_TIME resumeTime);
+
+/**********************************************************************
+ *  @details Checks if a task exists, queries the info if it exists
+ *  @return True if task exists
+ *********************************************************************/
+void *KeQueryTask(KE_HANDLE handle);
+
+/**********************************************************************
+ *  @details Gets a scheduler that contains the desired task
+ *  @return Pointer to Scheduler
+ *********************************************************************/
+void *KeQueryScheduler(KE_HANDLE handle);
+
 
 #endif

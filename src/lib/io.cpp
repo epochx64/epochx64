@@ -117,6 +117,7 @@ void putchar(const char c, IOStreamID ID)
         /* Additionally, we must wake scanf() from sleep if it's waiting for input */
         if (taskResumeHandle != 0)
         {
+            while (!keSysDescriptor->KeQueryTask(taskResumeHandle));
             keSysDescriptor->KeResumeTask(taskResumeHandle, 0);
         }
     }
@@ -195,14 +196,20 @@ void scanStr(char *dst)
     /* Continue until a newline or space is encountered */
     while(true)
     {
+        /* Read a char from stdin */
+        AcquireLock(&pStdin->lock);
+        bool isStdinFlushed = stdinFlushed();
+        ReleaseLock(&pStdin->lock);
+
         /* If there is no new data to read, yield this thread until
          * new data is available */
-        if (stdinFlushed())
+        if (isStdinFlushed)
         {
-            keSysDescriptor->KeSuspendTask(taskResumeHandle);
+            taskResumeHandle = keSysDescriptor->KeGetCurrentTaskHandle();
+            keSysDescriptor->KeSuspendCurrentTask();
+            taskResumeHandle = 0;
         }
 
-        /* Read a char from stdin */
         AcquireLock(&pStdin->lock);
         char c = scanchar();
         ReleaseLock(&pStdin->lock);
@@ -224,7 +231,33 @@ void scanStr(char *dst)
  *********************************************************************/
 UINT64 scanUnsigned()
 {
-    return 0;
+    UINT64 i = 0;
+
+    /* Continue until a newline or space is encountered */
+    while(true)
+    {
+        /* If there is no new data to read, yield this thread until
+         * new data is available */
+        if (stdinFlushed())
+        {
+            taskResumeHandle = keSysDescriptor->KeGetCurrentTaskHandle();
+            keSysDescriptor->KeSuspendTask(taskResumeHandle);
+        }
+
+        /* Read a char from stdin */
+        AcquireLock(&pStdin->lock);
+        char c = scanchar();
+        ReleaseLock(&pStdin->lock);
+
+        /* Stop reading once a space or newline has been encountered */
+        if ((c == ' ') || (c == '\n'))
+        {
+            break;
+        }
+
+        /* Write scanned char to destination buffer */
+        //dst[i++] = c;
+    }
 }
 
 /**********************************************************************
@@ -528,8 +561,6 @@ void vsprintf(char *dst, char *format, va_list args)
  *********************************************************************/
  void scanf(const char *format, ...)
 {
-    taskResumeHandle = keSysDescriptor->KeGetCurrentTaskHandle();
-
     va_list args;
     UINT64 len = string::strlen((unsigned char*)format);
 

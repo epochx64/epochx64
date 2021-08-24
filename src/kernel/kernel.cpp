@@ -47,6 +47,73 @@ void heapPrint()
     printf("#################### END HEAP PRINTOUT #######################\n");
 }
 
+static void testAvl()
+{
+
+}
+
+/**********************************************************************
+ *  @details Reads a word from the PCI configuration space
+ *  @param bus - Bus number
+ *  @param device - Device number
+ *  @param function - Function number
+ *  @param offset - Register offset. Bits 1..0 must be 0
+ *********************************************************************/
+UINT16 keReadPciWord(UINT32 bus, UINT32 device, UINT32 function, UINT32 offset)
+{
+    /* Calculate address in PCI configuration space based on:
+     * Enable Bit       31
+     * Reserved         30 - 24
+     * Bus Number       23 - 16
+     * Device Number    15 - 11
+     * Function Number  10 - 8
+     * Register Offset  7 - 0
+     */
+    UINT32 address = 0x80000000 | offset | (function << 8) | (device << 11) | (bus << 16);
+
+    /* Write the address to the CONFIG_ADDRESS register */
+    outd(0xCF8, address);
+
+    /* Read and return data from the CONFIG_DATA register */
+    return ind(0xCFC) & 0xFFFF;
+}
+
+/**********************************************************************
+ *  @details Populates the keSysDescriptor PCI-E structures
+ *********************************************************************/
+ static void keInitializePci()
+ {
+     /**************************************/
+
+     //AvlTree tree;
+     //KE_HANDLE counter = 0;
+     //KE_HANDLE handles[30];
+
+     //while(counter++ < 10)
+     //{
+     //    handles[counter] = counter;
+     //    tree.Insert((void *) counter, &handles[counter]);
+     //}
+
+     ////treePrintout(tree.root);
+
+     //tree.Remove(3);
+     ////treePrintout(tree.root);
+
+     //tree.Remove(1);
+     ////treePrintout(tree.root);
+     //tree.Remove(7);
+
+     //while(counter++ < 20)
+     //{
+     //    handles[counter] = counter;
+     //    tree.Insert((void *) counter, &(handles[counter]));
+     //}
+
+     //while(true);
+     /***************************************/
+ }
+
 /**********************************************************************
  *  @details Entry point of the kernel
  *  @param kernelInfo - Pointer to KE_SYS_DESCRIPTOR struct
@@ -78,36 +145,6 @@ void KeMain(KE_SYS_DESCRIPTOR *kernelInfo)
 
     /* Set the blocks which store the SysMemory bitmap as occupied */
     KeSysMemBitmapSet(0, keSysDescriptor->sysMemoryBitMapSize/BLOCK_SIZE + 1);
-
-    /**************************************/
-
-   //AvlTree tree;
-   //KE_HANDLE counter = 0;
-   //KE_HANDLE handles[30];
-
-   //while(counter++ < 10)
-   //{
-   //    handles[counter] = counter;
-   //    tree.Insert((void *) counter, &handles[counter]);
-   //}
-
-   ////treePrintout(tree.root);
-
-   //tree.Remove(3);
-   ////treePrintout(tree.root);
-
-   //tree.Remove(1);
-   ////treePrintout(tree.root);
-   //tree.Remove(7);
-
-   //while(counter++ < 20)
-   //{
-   //    handles[counter] = counter;
-   //    tree.Insert((void *) counter, &(handles[counter]));
-   //}
-
-   //while(true);
-    /***************************************/
 
     /*
      * Setup IDT, PS/2 devices, PIT, and APIC timer
@@ -159,9 +196,12 @@ void KeInitAPI()
     keSysDescriptor->KeCreateProcess = &KeCreateProcess;
     keSysDescriptor->KeScheduleTask = &KeScheduleTask;
     keSysDescriptor->KeSuspendTask = &KeSuspendTask;
+    keSysDescriptor->KeSuspendCurrentTask = &KeSuspendCurrentTask;
     keSysDescriptor->KeResumeTask = &KeResumeTask;
     keSysDescriptor->KeGetCurrentTaskHandle = &KeGetCurrentTaskHandle;
     keSysDescriptor->KeGetTime = &KeGetTime;
+    keSysDescriptor->KeQueryTask = &KeQueryTask;
+    keSysDescriptor->KeQueryScheduler = &KeQueryScheduler;
 }
 
 /**********************************************************************
@@ -251,8 +291,7 @@ KE_HANDLE KeGetCurrentTaskHandle()
  *********************************************************************/
 void KeSuspendTask(KE_HANDLE handle)
 {
-    UINT64 coreID = APICID();
-    Scheduler *scheduler = keSchedulers[coreID];
+    auto scheduler = (Scheduler*)KeQueryScheduler(handle);
 
     /* Lock the scheduler to prevent it from accessing the structure we're about to edit */
     AcquireLock(&scheduler->schedulerLock);
@@ -267,6 +306,17 @@ void KeSuspendTask(KE_HANDLE handle)
 
     /* Unlock the scheduler */
     ReleaseLock(&scheduler->schedulerLock);
+}
+
+/**********************************************************************
+ *  @details Stops executing the current thread until unsuspend
+ *  @param handle - Handle of the task
+ *********************************************************************/
+void KeSuspendCurrentTask()
+{
+    KE_HANDLE currentHandle = KeGetCurrentTaskHandle();
+    auto task = (Task*)KeQueryTask(currentHandle);
+    KeSuspendTask(currentHandle);
 
     /* Invoke the APIC timer interrupt, repeating if the scheduler is locked */
     while (true)
@@ -289,8 +339,7 @@ void KeSuspendTask(KE_HANDLE handle)
  *********************************************************************/
 void KeResumeTask(KE_HANDLE handle, KE_TIME resumeTime)
 {
-    UINT64 coreID = APICID();
-    Scheduler *scheduler = keSchedulers[coreID];
+    auto scheduler = (Scheduler*)KeQueryScheduler(handle);
 
     /* Lock the scheduler to prevent it from accessing the structure we're about to edit */
     AcquireLock(&scheduler->schedulerLock);
@@ -315,4 +364,59 @@ void KeResumeTask(KE_HANDLE handle, KE_TIME resumeTime)
 KE_TIME KeGetTime()
 {
     return Scheduler::GetCurrentTime();
+}
+
+/**********************************************************************
+ *  @details Gets a scheduler that contains the desired task
+ *  @return Pointer to Scheduler
+ *********************************************************************/
+void *KeQueryScheduler(KE_HANDLE handle)
+{
+    /* For each scheduler */
+    for (UINT64 i = 0; i < keSysDescriptor->nCores; i++)
+    {
+        Scheduler *scheduler = keSchedulers[i];
+
+        /* Acquire lock for thread safety */
+        AcquireLock(&scheduler->schedulerLock);
+
+        /* Get the task if it exists */
+        if (scheduler->TaskTree.Search(handle))
+        {
+            ReleaseLock(&scheduler->schedulerLock);
+            return scheduler;
+        }
+
+        ReleaseLock(&scheduler->schedulerLock);
+    }
+
+    return nullptr;
+}
+
+/**********************************************************************
+ *  @details Checks if a task exists, queries the info if it exists
+ *  @return Pointer to Task
+ *********************************************************************/
+void *KeQueryTask(KE_HANDLE handle)
+{
+    /* For each scheduler */
+    for (UINT64 i = 0; i < keSysDescriptor->nCores; i++)
+    {
+        Scheduler *scheduler = keSchedulers[i];
+
+        /* Acquire lock for thread safety */
+        AcquireLock(&scheduler->schedulerLock);
+
+        /* Get the task if it exists */
+        auto task = (Task*)scheduler->TaskTree.Search(handle);
+        if (task)
+        {
+            ReleaseLock(&scheduler->schedulerLock);
+            return task;
+        }
+
+        ReleaseLock(&scheduler->schedulerLock);
+    }
+
+    return nullptr;
 }

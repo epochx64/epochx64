@@ -211,9 +211,7 @@ void KeInitAPIC()
          * The Application Processors (APs) are going to need these for when they
          * bootstrap from 16-bit real mode to 64-bit long mode
          */
-        UINT64 cr3Value;
-        GetCR3Value(&cr3Value);
-        CR3Value = cr3Value;
+        CR3Value = GetCR3Value();
 
         UINT64 Vector = (UINT64)&APBootstrap >> 12;
 

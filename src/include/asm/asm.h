@@ -17,7 +17,9 @@ extern "C"
     void nop();
 
     BYTE inb(WORD port);
+    DWORD ind(WORD port);
     void outb(WORD port, BYTE val);
+    void outd(WORD port, UINT32 val);
 
     void sti();
     void cli();
@@ -36,7 +38,7 @@ extern "C"
 
     void APBootstrap();
 
-    void GetCR3Value(UINT64 *Value);
+    UINT64 GetCR3Value();
 
     UINT64 APICID();
 

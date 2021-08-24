@@ -175,7 +175,6 @@ ReadRFLAGS:
 GetCR3Value:
     xor rax, rax
     mov rax, cr3
-    mov [rdi], rax
 
     ret
 
@@ -246,6 +245,24 @@ inb:
 
     ret
 
+    global ind
+ind:
+    push rdx
+
+    xor rax, rax
+    mov dx, di  ;  Port #
+    in eax, dx
+
+    ; Perform a delay
+    jmp .1
+.1:
+    jmp .2
+.2:
+
+    pop rdx
+
+    ret
+
     global outb
 outb:
     push rdx
@@ -263,6 +280,31 @@ outb:
     jmp .2
 .2:
 
+    pop rax
+    pop rdx
+
+    ret
+
+    global outd
+outd:
+    push rdx
+    push rax
+    push rbx
+
+    mov dx, di
+    mov rax, rsi
+    mov rbx, 0x00000000FFFFFFFF
+    and rax, rbx
+
+    out dx, eax
+
+    ; Perform a delay
+    jmp .1
+.1:
+    jmp .2
+.2:
+
+    pop rbx
     pop rax
     pop rdx
 
