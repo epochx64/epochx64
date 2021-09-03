@@ -67,7 +67,7 @@ void Scheduler::PopFromActiveTaskList(Task *t)
     /* Traverse the linked list to get the previous element before currentTask */
     Task *currentTaskIter = activeTaskList;
     Task *currentTaskIterPrev = nullptr;
-    while(currentTaskIter != nullptr && currentTaskIter != t)
+    while(currentTaskIter != t)
     {
         currentTaskIterPrev = currentTaskIter;
         currentTaskIter = currentTaskIter->nextActiveTask;
@@ -84,6 +84,8 @@ void Scheduler::PopFromActiveTaskList(Task *t)
         /* Remove task */
         currentTaskIterPrev->nextActiveTask = currentTaskIter->nextActiveTask;
     }
+
+    t->nextActiveTask = nullptr;
 }
 
 /**********************************************************************
@@ -159,6 +161,7 @@ void Scheduler::Tick()
             /* Do not destroy object if the task is just being suspended */
             if (!currentTask->suspended)
             {
+                SerialOut("Scheduler %u removing node %u\n", this->coreID, currentTask->handle);
                 TaskTree.Remove(currentTask->handle);
                 delete currentTask;
             }

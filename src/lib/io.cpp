@@ -217,6 +217,7 @@ void scanStr(char *dst)
         /* Stop reading once a space or newline has been encountered */
         if ((c == ' ') || (c == '\n'))
         {
+            dst[i] = 0;
             break;
         }
 
@@ -232,19 +233,25 @@ void scanStr(char *dst)
 UINT64 scanUnsigned()
 {
     UINT64 i = 0;
+    UINT64 numbers[100];
 
     /* Continue until a newline or space is encountered */
     while(true)
     {
+        /* Read a char from stdin */
+        AcquireLock(&pStdin->lock);
+        bool isStdinFlushed = stdinFlushed();
+        ReleaseLock(&pStdin->lock);
+
         /* If there is no new data to read, yield this thread until
          * new data is available */
-        if (stdinFlushed())
+        if (isStdinFlushed)
         {
             taskResumeHandle = keSysDescriptor->KeGetCurrentTaskHandle();
-            keSysDescriptor->KeSuspendTask(taskResumeHandle);
+            keSysDescriptor->KeSuspendCurrentTask();
+            taskResumeHandle = 0;
         }
 
-        /* Read a char from stdin */
         AcquireLock(&pStdin->lock);
         char c = scanchar();
         ReleaseLock(&pStdin->lock);
@@ -256,8 +263,17 @@ UINT64 scanUnsigned()
         }
 
         /* Write scanned char to destination buffer */
-        //dst[i++] = c;
+        numbers[i++] = CHAR_TO_INT(c);
     }
+
+    /* Sum the recorded numbers */
+    UINT64 accumulator = 0;
+    for (UINT64 j = 1; j <= i; j++)
+    {
+        accumulator += numbers[j-1] * math::pow(10, i - j);
+    }
+
+    return accumulator;
 }
 
 /**********************************************************************
@@ -559,7 +575,7 @@ void vsprintf(char *dst, char *format, va_list args)
 /**********************************************************************
  *  @details Reads from the stdin object a formatted string
  *********************************************************************/
- void scanf(const char *format, ...)
+void scanf(const char *format, ...)
 {
     va_list args;
     UINT64 len = string::strlen((unsigned char*)format);
@@ -601,4 +617,44 @@ void vsprintf(char *dst, char *format, va_list args)
     va_end(args);
 
     taskResumeHandle = 0;
+}
+
+/**********************************************************************
+ *  @details Reads from the stdin object a string until it terminates with newline
+ *********************************************************************/
+void scanLine(char *line)
+{
+    UINT64 i = 0;
+
+    /* Continue until a newline or space is encountered */
+    while(true)
+    {
+        /* Read a char from stdin */
+        AcquireLock(&pStdin->lock);
+        bool isStdinFlushed = stdinFlushed();
+        ReleaseLock(&pStdin->lock);
+
+        /* If there is no new data to read, yield this thread until
+         * new data is available */
+        if (isStdinFlushed)
+        {
+            taskResumeHandle = keSysDescriptor->KeGetCurrentTaskHandle();
+            keSysDescriptor->KeSuspendCurrentTask();
+            taskResumeHandle = 0;
+        }
+
+        AcquireLock(&pStdin->lock);
+        char c = scanchar();
+        ReleaseLock(&pStdin->lock);
+
+        /* Stop reading once a space or newline has been encountered */
+        if (c == '\n')
+        {
+            line[i] = 0;
+            break;
+        }
+
+        /* Write scanned char to destination buffer */
+        line[i++] = c;
+    }
 }

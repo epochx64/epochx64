@@ -15,6 +15,7 @@
 
 #define STDOUT_DEFAULT_SIZE 0x1000
 #define MAX_SPRINT_LEN 420
+#define CHAR_TO_INT(chr) ((chr) - '0')
 
 typedef struct
 {
@@ -58,6 +59,7 @@ void printf(char *format, ...);
 void sprintf(char *dst, char *format, ...);
 void vsprintf(char *dst, char *format, va_list args);
 void scanf(const char *format, ...);
+void scanLine(char *line);
 
 void SerialOut(char *format, ...);
 void vSerialOut(char *format, va_list args);

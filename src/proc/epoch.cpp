@@ -23,9 +23,11 @@ ext2::RAMDisk *keRamDisk;
 KE_CREATE_PROCESS KeCreateProcess;
 KE_SCHEDULE_TASK KeScheduleTask;
 KE_SUSPEND_TASK KeSuspendTask;
+KE_SUSPEND_CURRENT_TASK KeSuspendCurrentTask;
 KE_RESUME_TASK KeResumeTask;
 KE_GET_CURRENT_TASK_HANDLE KeGetCurrentTaskHandle;
 KE_GET_TIME KeGetTime;
+KE_QUERY_TASK KeQueryTask;
 
 /* DWM function list */
 DWM_CREATE_WINDOW DwmCreateWindow;
@@ -42,6 +44,8 @@ void KeInitAPI()
     KeGetCurrentTaskHandle = keSysDescriptor->KeGetCurrentTaskHandle;
     KeResumeTask = keSysDescriptor->KeResumeTask;
     KeGetTime = keSysDescriptor->KeGetTime;
+    KeQueryTask = keSysDescriptor->KeQueryTask;
+    KeSuspendCurrentTask = keSysDescriptor->KeSuspendCurrentTask;
 }
 
 void DwmInitAPI()

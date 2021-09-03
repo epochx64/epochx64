@@ -92,7 +92,7 @@ void AvlTree::Remove(KE_HANDLE handle)
 
     /* Get the task tree node from the handle */
     TREE_NODE *node = SearchNode(handle);
-    FaultLogAssertSerial(node != nullptr, "Node to remove not found in tree\n");
+    FaultLogAssertSerial(node != nullptr, "Node %u to remove not found in tree\n", handle);
     FaultLogAssertSerial(*node->key == handle, "Found node ID:%16x does not match passed handle\n", (UINT64)node);
 
     TREE_NODE *parent = node->parent;

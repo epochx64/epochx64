@@ -135,13 +135,13 @@ int main()
     properties.x = 200;
     properties.y = 100;
     DwmCreateWindow(&properties);
-    printf("HELLO WORLD FROM TERMINAL.elf");
+    printf("HELLO WORLD FROM TERMINAL.elf\n");
 
     while (true)
     {
         char input[64] = { 0 };
-        printf("\ntype something > ");
-        scanf("%s", input);
+        printf("type something > ");
+        scanLine(input);
 
         if(input[1] == 'S') break;
     }
