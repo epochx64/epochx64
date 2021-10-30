@@ -73,10 +73,5 @@ void _epochstart(KE_SYS_DESCRIPTOR *sysDescriptor, STDOUT *out, STDIN *in, UINT8
     setStdout(stdout);
     setStdin(stdin);
 
-    if(!noWindow)
-    {
-
-    }
-
     main();
 }

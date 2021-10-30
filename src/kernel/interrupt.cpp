@@ -8,41 +8,32 @@ extern "C" UINT64 IDT64_PTR;
 namespace interrupt
 {
     using namespace log;
-    /*--------------------------------------
+    /***************************************
      *            Exceptions
      *  TODO: Setup proper exception handling
-     ---------------------------------------*/
+     ***************************************/
     extern "C" KE_TASK_DESCRIPTOR ERR_INFO;
     KE_TASK_DESCRIPTOR ERR_INFO;
 
-    void KeHalt()
+    void GenericExceptionHandler(UINT64 ErrorCode, UINT64 RIP, UINT64 CS, UINT64 RFLAGS, UINT64 RSP)
     {
-        /* Clear interrupts */
-        asm volatile ("cli");
+        /* Print error message to serial */
+        char output[420];
+        SerialOut("-------EXCEPTION %16x -------\nRIP: 0x%16x\nCS: 0x%16x\nRFLAGS: 0x%16x\nRSP: 0x%16x\n", ErrorCode, RIP, CS, RFLAGS, RSP);
+        SerialOut("Scheduler: %u\n", APICID());
 
-        while(true) asm volatile ("hlt");
-    }
+        /* Perform a stack trace */
 
-    void GenericExceptionHandler(UINT64 ErrorCode, UINT64 RIP, UINT64 CS, UINT64 RFLAGS)
-    {
-        /* Create halt task */
-        //Task t((UINT64)&KeHalt,  0, false, 0, 0, va_list{});
-
-        /* Halt all schedulers */
-        //for (UINT64 i = 0; i < keSysDescriptor->nCores; i++)
-        //{
-        //    keSchedulers[i]->ScheduleTask(&t);
-        //}
-
-        /* Print error message */
-        printf("-------EXCEPTION-------\nRIP: 0x%16x\nCS: 0x%16x\nRFLAGS: 0x%16x\n", RIP, CS, RFLAGS);
-
-        //kout << "*** Exception 0x" << HEX << ErrorCode << " generated, halting ***\n"
-        //<< "External: " << (UINT8)(ErrorCode & 1) << "\n"
-        //<< "GDT 0, IDT 1, LDT 2, IDT, 3: " << (UINT8)(ErrorCode & 0b110) << "\n"
-        //<< "Selector Index: 0x" << (UINT16)((ErrorCode >> 3) & 0x1FFF) << "\n"
-        //<< "CS:EIP: 0x" << (UINT8)CS << ":" << RIP << "\n"
-        //<< "EFLAGS: 0x" << RFLAGS << "\n";
+        SerialOut("Scheduler stats:\n");
+        for (UINT64 i = 0; i < keSysDescriptor->nCores; i++)
+        {
+            auto scheduler = keSchedulers[i];
+            SerialOut("Scheduler %u:\n", i);
+            SerialOut("Current task(0x%16x) handle: 0x%08x\n", scheduler->currentTask, scheduler->currentTask->handle);
+            SerialOut("Current task pTaskInfo: %16x\n", scheduler->currentTask->pTaskInfo);
+            SerialOut("Current task RIP: 0x%16x\n", scheduler->currentTask->pTaskInfo->IRETQRIP);
+            SerialOut("Current task RSP: 0x%16x\n", scheduler->currentTask->pTaskInfo->rsp);
+        }
 
         hlt();
     }

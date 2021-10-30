@@ -15,7 +15,7 @@
 
 static STDOUT *pStdout;
 static STDIN *pStdin;
-static KE_HANDLE taskResumeHandle = 0;
+static volatile KE_HANDLE taskResumeHandle = 0;
 
 /**********************************************************************
  *  Function definitions
@@ -118,7 +118,9 @@ void putchar(const char c, IOStreamID ID)
         if (taskResumeHandle != 0)
         {
             while (!keSysDescriptor->KeQueryTask(taskResumeHandle));
-            keSysDescriptor->KeResumeTask(taskResumeHandle, 0);
+
+            if (taskResumeHandle != 0)
+                keSysDescriptor->KeResumeTask(taskResumeHandle, 0);
         }
     }
 
@@ -299,6 +301,11 @@ void printUnsignedDec(UINT64 dec)
     {
         putchar(outString[i], IOSTREAM_ID_STDOUT);
     }
+
+    if (len == 0)
+    {
+        putchar('0', IOSTREAM_ID_STDOUT);
+    }
 }
 
 /**********************************************************************
@@ -314,6 +321,11 @@ void printUnsignedDec(UINT64 dec)
     for (UINT64 i = 0; i < len; i++)
     {
         dst[(*offset)++] = outString[i];
+    }
+
+    if (len == 0)
+    {
+        dst[(*offset)++] = '0';
     }
 }
 

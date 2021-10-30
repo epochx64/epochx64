@@ -20,13 +20,14 @@ namespace heap
     UINT64 occupiedBytes = 0;
 
     // Pointer to first free BLOCK_HDR
-    BLOCK_HDR *head = (BLOCK_HDR *) pHeap;
+    BLOCK_HDR *head;
 
     LOCK heapLock = LOCK_STATUS_FREE;
 
     /// Must be called only once, before using the malloc/free functions
     void init()
     {
+        head = (BLOCK_HDR*) pHeap;
         head->size = heapSize - sizeof(BLOCK_HDR);
 
         head->nextFree = nullptr;
@@ -76,6 +77,8 @@ namespace heap
         // TODO: Track RAM usage
         auto heapIterator = head;
 
+        FaultLogAssertSerial(heapIterator, "heap head is NULL\n");
+
         // Drill down the linked-list until a large enough block is found
         while(heapIterator != nullptr && heapIterator->size < size)
             heapIterator = heapIterator->nextFree;
@@ -84,6 +87,7 @@ namespace heap
         if(heapIterator == nullptr)
         {
             ReleaseLock(&heapLock);
+            FaultLogAssertSerial(0, "No more free blocks for size %u. head=%16x\n", size, head);
             return nullptr;
         }
 
@@ -92,14 +96,13 @@ namespace heap
         if(heapIterator->size <= (size + sizeof(BLOCK_HDR))) allocFull(heapIterator);
         else allocPartial(heapIterator, size);
 
-        //heapIterator->nextFree = nullptr;
-        //heapIterator->prevFree = nullptr;
-
-        //SerialOut("allocating 0x%16x with size %u\n", (UINT64)heapIterator + sizeof(BLOCK_HDR), size);
-
         ReleaseLock(&heapLock);
 
-        return (void*)((UINT64)heapIterator + sizeof(BLOCK_HDR));
+        FaultLogAssertSerial(((UINT64)heapIterator >= (UINT64)pHeap) && ((UINT64)heapIterator < ((UINT64)pHeap + heapSize)),
+                             "heapIterator(0x%16x) is invalid\n", (UINT64)heapIterator);
+        auto retVal = (void*)((UINT64)heapIterator + sizeof(BLOCK_HDR));
+
+        return retVal;
     }
 
     /// Free function

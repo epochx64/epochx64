@@ -66,4 +66,4 @@ link:
 	bash bashscript.sh
 
 exec:
-	qemu-system-x86_64 -smp cores=4,threads=1,sockets=1 -m 8G -serial stdio -L OVMF/ -bios OVMF-pure-efi.fd -cdrom img/epochx64.iso
+	qemu-system-x86_64 -machine q35 -smp cores=4,threads=1,sockets=1 -m 8G -serial stdio -L OVMF/ -bios OVMF-pure-efi.fd -cdrom img/epochx64.iso -nic user,model=e1000

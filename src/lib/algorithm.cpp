@@ -103,7 +103,7 @@ void AvlTree::Remove(KE_HANDLE handle)
 
     if (node == root)
     {
-        FaultLogAssertSerial(!((replacementNode == nullptr) && (nNodes > 0)), "NULL root with nonempty tree\n");
+        FaultLogAssertSerial(replacementNode || (nNodes == 0), "NULL root with nonempty tree\n");
 
         root = replacementNode;
     }
@@ -221,7 +221,7 @@ void *AvlTree::Search(KE_HANDLE handle, TREE_NODE *startNode)
     if (startNode == nullptr)
     {
         startNode = root;
-        FaultLogAssertSerial(startNode, "NULL root node\n");
+        FaultLogAssertSerial(startNode, "(%u) NULL root node\n", handle);
     }
 
     TREE_NODE *nodeFinder = startNode;
@@ -256,7 +256,7 @@ TREE_NODE *AvlTree::SearchNode(KE_HANDLE handle, TREE_NODE *startNode)
     if (startNode == nullptr)
     {
         startNode = root;
-        FaultLogAssertSerial(startNode, "NULL root node\n");
+        FaultLogAssertSerial(startNode, "%u NULL root node\n", handle);
     }
 
     TREE_NODE *nodeFinder = startNode;
