@@ -67,10 +67,11 @@ GenericException:
     mov [ERR_INFO + 632], rax
 
     ;   Error code literally never shows up so don't mind the janky offsets
-    mov rdi, [rsp-8]    ;   (Nonexistent) error code if it did exist
-    mov rsi, [rsp+0]    ;   CS
-    mov rdx, [rsp+8]    ;   RIP
-    mov rcx, [rsp+16]   ;   RFLAGS
+    mov rdi, [rsp]    ;   (Nonexistent) error code if it did exist
+    mov rsi, [rsp+8]    ;   RIP
+    mov rdx, [rsp+16]    ;   CS
+    mov rcx, [rsp+24]   ;   RFLAGS
+    mov r8, [rsp+32]    ;   RSP
 
     call GenericExceptionHandler
     iretq

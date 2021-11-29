@@ -38,6 +38,97 @@ namespace interrupt
         hlt();
     }
 
+    void ISR0DivideZero()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+    void ISR1Debug()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+    void ISR2NMI()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+    void ISR3Breakpoint()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+    void ISR4Overflow()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+    void ISR5BoundRange()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+    void ISR6InvalidOpcode()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+    void ISR7DeviceUnavailable()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+    void ISR8DoubleFault()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+    void ISR9CoprocessorOverrun()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+    void ISR10InvalidTSS()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+    void ISR11SegmentUnpresent()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+    void ISR12Stack()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+    void ISR13GeneralProtectionFault()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+    void ISR14PageFault()
+    {
+        SerialOut("%s!\n", __FUNCTION__ + 3);
+        hlt();
+    }
+
+
     /*--------------------------------------
     *          Other ISRs
     ---------------------------------------*/
@@ -146,10 +237,10 @@ namespace interrupt
 
         //  Might make individual exception ISRs later
         void (*ISR_list[])() = {
-                &GenericException,&GenericException,&GenericException,&GenericException,
-                &GenericException,&GenericException,&GenericException,&GenericException,
-                &GenericException,&GenericException,&GenericException,&GenericException,
-                &GenericException,&GenericException,&GenericException,&GenericException,
+                &ISR0DivideZero,&ISR1Debug,&ISR2NMI,&ISR3Breakpoint,
+                &ISR4Overflow,&ISR5BoundRange,&ISR6InvalidOpcode,&ISR7DeviceUnavailable,
+                &ISR8DoubleFault,&ISR9CoprocessorOverrun,&ISR10InvalidTSS,&ISR11SegmentUnpresent,
+                &ISR12Stack,&ISR13GeneralProtectionFault,&ISR14PageFault,&GenericException,
 
                 &GenericException,&GenericException,&GenericException,&GenericException,
                 &GenericException,&GenericException,&GenericException,&GenericException,

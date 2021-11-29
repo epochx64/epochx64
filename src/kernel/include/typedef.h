@@ -18,7 +18,7 @@ namespace heap
     extern BLOCK_HDR *head;
 
     // A must be to the left of B
-    #define ADJACENT(A,B) ((UINT64)A + sizeof(BLOCK_HDR) + A->size == (UINT64)B)
+    #define ADJACENT(A,B) ((UINT64)(A) + sizeof(BLOCK_HDR) + (A)->size == (UINT64)(B))
 }
 
 namespace interrupt
@@ -161,6 +161,41 @@ typedef struct
     SDT_HEADER Header;
 
 } __attribute__((packed)) MULTIPLE_APIC_DESCRIPTOR_TABLE;
+
+typedef struct
+{
+    SDT_HEADER header;
+    UINT64 reserved;
+
+    struct {
+        UINT64 baseConfigAddress;
+        UINT16 segmentGroup;
+        UINT8 startBus;
+        UINT8 endBus;
+        UINT32 reserved;
+    } segmentGroups[];
+} __attribute__((packed)) MCFG_TABLE;
+
+typedef struct
+{
+    UINT16 vendorId;
+    UINT16 deviceId;
+    UINT16 command;
+    UINT16 status;
+    UINT8 revisionId;
+    UINT8 progIf;
+    UINT8 subclass;
+    UINT8 classCode;
+    UINT8 cacheLineSize;
+    UINT8 latencyTimer;
+    UINT8 headerType;
+    UINT8 bist;
+} __attribute__((packed)) PCI_DEVICE_BASE_HEADER;
+
+typedef struct
+{
+    UINT64 entries[512];
+} __attribute__((packed)) PAGE_TABLE;
 
 /*
  * Bundles up all the ACPI tables that we are

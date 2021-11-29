@@ -24,7 +24,7 @@ namespace interrupt
 
     extern "C" void int49();
 
-    extern "C" void GenericExceptionHandler(UINT64 ErrorCode, UINT64 RIP, UINT64 CS, UINT64 RFLAGS);
+    extern "C" void GenericExceptionHandler(UINT64 ErrorCode, UINT64 RIP, UINT64 CS, UINT64 RFLAGS, UINT64 RSP);
 
     extern "C" void ISR32TimerHandler();
     extern "C" void ISR33KeyboardHandler();
