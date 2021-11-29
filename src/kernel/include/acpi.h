@@ -16,7 +16,6 @@ extern "C" KE_AP_BOOTSTRAP_INFO *pAPBootstrapInfo;
 void KeInitACPI();
 
 void KeInitAPIC();
-void KeCalibrateAPICTimer(UINT64 frequency);
 
 /*
  * These depend on the value of bool x2APIC

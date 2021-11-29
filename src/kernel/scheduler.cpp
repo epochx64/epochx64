@@ -1,3 +1,4 @@
+#include <fault.h>
 #include "scheduler.h"
 
 /**********************************************************************
@@ -161,7 +162,7 @@ void Scheduler::Tick()
             /* Do not destroy object if the task is just being suspended */
             if (!currentTask->suspended)
             {
-                SerialOut("Scheduler %u removing node %u\n", this->coreID, currentTask->handle);
+                FaultLogAssertSerial(currentTask->handle != 0, "currentTask->handle is 0\n");
                 TaskTree.Remove(currentTask->handle);
                 delete currentTask;
             }
@@ -175,6 +176,7 @@ void Scheduler::Tick()
 
         /* Remove task from top of priority queue */
         Task *newActiveTask = schedule.Deque();
+        FaultLogAssertSerial(newActiveTask, "Dequeue returned NULL\n");
 
         /* If there are no active tasks, stop idling */
         if(activeTaskList == idleTask) newActiveTask->nextActiveTask = nullptr;
@@ -190,6 +192,9 @@ void Scheduler::Tick()
     /* If the current active task is at the end of the list, go back to beginning of the list */
     if(currentTask->nextActiveTask == nullptr) currentTask = activeTaskList;
     else currentTask = currentTask->nextActiveTask;
+
+    FaultLogAssertSerial(currentTask, "currentTask is NULL\n");
+    FaultLogAssertSerial(currentTask->pTaskInfo, "currentTask(0x%16x)->pTaskInfo is NULL\n", currentTask);
 
     /* Set current task in the global task structure */
     keTasks[coreID] = currentTask->pTaskInfo;
@@ -261,6 +266,8 @@ Task::Task(UINT64 entry, KE_TIME startTime, bool reschedule, KE_TIME periodNanoS
     if ((UINT64)this->pTaskInfo & 0x0F)
         this->pTaskInfo = (KE_TASK_DESCRIPTOR*)(((UINT64)this->pTaskInfo + 0x10) & 0xFFFFFFFFFFFFFFF0ULL);
 
+    FaultLogAssertSerial(pTaskInfo, "pTaskInfo is NULL\n");
+
     /* Zero out the newly allocated KE_TASK_DESCRIPTOR */
     memset64(pTaskInfo, sizeof(KE_TASK_DESCRIPTOR), 0);
 
@@ -298,8 +305,8 @@ Task::Task(UINT64 entry, KE_TIME startTime, bool reschedule, KE_TIME periodNanoS
  *********************************************************************/
 Task::~Task()
 {
-    delete (UINT8*)pStackUnaligned;
-    delete (UINT8*)pTaskInfoUnaligned;
+    heap::free((UINT8*)pStackUnaligned);
+    heap::free((UINT8*)pTaskInfoUnaligned);
 }
 
 /**********************************************************************

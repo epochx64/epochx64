@@ -39,6 +39,8 @@ extern "C"
     void APBootstrap();
 
     UINT64 GetCR3Value();
+    void SetCR3Value(UINT64 value);
+    UINT64 GetCR4Value();
 
     UINT64 APICID();
 

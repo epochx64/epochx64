@@ -15,19 +15,11 @@ extern "C" void __attribute__((sysv_abi)) _epochstart(KE_SYS_DESCRIPTOR *sysDesc
 KE_SYS_DESCRIPTOR *keSysDescriptor;
 ext2::RAMDisk *keRamDisk;
 
+UINT64 keSyscallTable;
+
 /**********************************************************************
  *  Function declarations
  *********************************************************************/
-
-/* Kernel API function list */
-KE_CREATE_PROCESS KeCreateProcess;
-KE_SCHEDULE_TASK KeScheduleTask;
-KE_SUSPEND_TASK KeSuspendTask;
-KE_SUSPEND_CURRENT_TASK KeSuspendCurrentTask;
-KE_RESUME_TASK KeResumeTask;
-KE_GET_CURRENT_TASK_HANDLE KeGetCurrentTaskHandle;
-KE_GET_TIME KeGetTime;
-KE_QUERY_TASK KeQueryTask;
 
 /* DWM function list */
 DWM_CREATE_WINDOW DwmCreateWindow;
@@ -35,18 +27,6 @@ DWM_CREATE_WINDOW DwmCreateWindow;
 /**********************************************************************
  *  Function definitions
  *********************************************************************/
-
-void KeInitAPI()
-{
-    KeCreateProcess = keSysDescriptor->KeCreateProcess;
-    KeScheduleTask = keSysDescriptor->KeScheduleTask;
-    KeSuspendTask = keSysDescriptor->KeSuspendTask;
-    KeGetCurrentTaskHandle = keSysDescriptor->KeGetCurrentTaskHandle;
-    KeResumeTask = keSysDescriptor->KeResumeTask;
-    KeGetTime = keSysDescriptor->KeGetTime;
-    KeQueryTask = keSysDescriptor->KeQueryTask;
-    KeSuspendCurrentTask = keSysDescriptor->KeSuspendCurrentTask;
-}
 
 void DwmInitAPI()
 {
@@ -64,8 +44,8 @@ void _epochstart(KE_SYS_DESCRIPTOR *sysDescriptor, STDOUT *out, STDIN *in, UINT8
 
     /* Initialize process heap and API function pointers */
     heap::init();
-    KeInitAPI();
     DwmInitAPI();
+    keSyscallTable = keSysDescriptor->keSyscallTable;
 
     /* Assign stdin/out objects */
     STDOUT *stdout = (out == nullptr) ? createStdout():out;

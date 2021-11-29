@@ -11,12 +11,19 @@ extern KE_SYS_DESCRIPTOR *keSysDescriptor;
 /*
  * Start of kernel function list
  */
-extern KE_CREATE_PROCESS KeCreateProcess;
-extern KE_SCHEDULE_TASK KeScheduleTask;
-extern KE_SUSPEND_TASK KeSuspendTask;
-extern KE_GET_CURRENT_TASK_HANDLE KeGetCurrentTaskHandle;
-extern KE_RESUME_TASK KeResumeTask;
-extern KE_GET_TIME KeGetTime;
+
+extern "C"
+{
+    KE_HANDLE __attribute__((sysv_abi)) KeCreateProcess(PROCESS_PROPERTIES *properties);
+    KE_TIME __attribute__((sysv_abi)) KeGetTime();
+    KE_HANDLE __attribute__((sysv_abi)) KeScheduleTask(UINT64 entry, KE_TIME startTime, UINT8 reschedule, KE_TIME periodNanoSeconds, UINT64 nArgs, ...);
+    void __attribute__((sysv_abi)) KeSuspendTask(KE_HANDLE handle);
+    void __attribute__((sysv_abi)) KeSuspendCurrentTask();
+    KE_HANDLE __attribute__((sysv_abi)) KeGetCurrentTaskHandle();
+    void __attribute__((sysv_abi)) KeResumeTask(KE_HANDLE handle, KE_TIME resumeTime);
+    void *__attribute__((sysv_abi)) KeQueryTask(KE_HANDLE handle);
+    void *__attribute__((sysv_abi)) KeQueryScheduler(KE_HANDLE handle);
+}
 
 /* DWM function list */
 extern DWM_CREATE_WINDOW DwmCreateWindow;

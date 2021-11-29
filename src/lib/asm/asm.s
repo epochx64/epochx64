@@ -178,6 +178,17 @@ GetCR3Value:
 
     ret
 
+    global SetCR3Value
+SetCR3Value:
+    mov rax, rdi
+    mov cr3, rax
+    ret
+
+   global GetCR4Value
+GetCR4Value:
+    mov rax, cr4
+    ret
+
     global SetRSP
 SetRSP:
     sub rdi, 8

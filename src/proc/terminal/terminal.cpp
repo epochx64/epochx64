@@ -121,6 +121,8 @@ static void termLoop()
 
 }
 
+static char input[4096];
+
 int main()
 {
     /* Create the terminal window */
@@ -139,12 +141,11 @@ int main()
 
     while (true)
     {
-        char input[64] = { 0 };
         printf("type something > ");
         scanLine(input);
 
         if(input[1] == 'S') break;
     }
 
-    printf("exiting teminal\n");
+    printf("exiting terminal\n");
 }

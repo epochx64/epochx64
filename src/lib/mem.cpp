@@ -1,6 +1,7 @@
 #include "mem.h"
 #include <io.h>
 #include <fault.h>
+#include <algorithm.h>
 
 void* operator new ( size_t count ){ return heap::malloc(count); }
 void* operator new[] ( size_t count ) { return heap::malloc(count); }

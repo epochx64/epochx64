@@ -17,6 +17,15 @@ static STDOUT *pStdout;
 static STDIN *pStdin;
 static volatile KE_HANDLE taskResumeHandle = 0;
 
+extern "C"
+{
+    void __attribute__((sysv_abi)) KeSuspendCurrentTask();
+    KE_HANDLE __attribute__((sysv_abi)) KeGetCurrentTaskHandle();
+    void __attribute__((sysv_abi)) KeResumeTask(KE_HANDLE handle, KE_TIME resumeTime);
+    void *__attribute__((sysv_abi)) KeQueryTask(KE_HANDLE handle);
+    void __attribute__((sysv_abi)) KeSuspendTask(KE_HANDLE handle);
+}
+
 /**********************************************************************
  *  Function definitions
  *********************************************************************/
@@ -117,10 +126,10 @@ void putchar(const char c, IOStreamID ID)
         /* Additionally, we must wake scanf() from sleep if it's waiting for input */
         if (taskResumeHandle != 0)
         {
-            while (!keSysDescriptor->KeQueryTask(taskResumeHandle));
+            while (!KeQueryTask(taskResumeHandle));
 
             if (taskResumeHandle != 0)
-                keSysDescriptor->KeResumeTask(taskResumeHandle, 0);
+                KeResumeTask(taskResumeHandle, 0);
         }
     }
 
@@ -207,8 +216,8 @@ void scanStr(char *dst)
          * new data is available */
         if (isStdinFlushed)
         {
-            taskResumeHandle = keSysDescriptor->KeGetCurrentTaskHandle();
-            keSysDescriptor->KeSuspendCurrentTask();
+            taskResumeHandle = KeGetCurrentTaskHandle();
+            KeSuspendCurrentTask();
             taskResumeHandle = 0;
         }
 
@@ -249,8 +258,8 @@ UINT64 scanUnsigned()
          * new data is available */
         if (isStdinFlushed)
         {
-            taskResumeHandle = keSysDescriptor->KeGetCurrentTaskHandle();
-            keSysDescriptor->KeSuspendCurrentTask();
+            taskResumeHandle = KeGetCurrentTaskHandle();
+            KeSuspendCurrentTask();
             taskResumeHandle = 0;
         }
 
@@ -650,8 +659,8 @@ void scanLine(char *line)
          * new data is available */
         if (isStdinFlushed)
         {
-            taskResumeHandle = keSysDescriptor->KeGetCurrentTaskHandle();
-            keSysDescriptor->KeSuspendCurrentTask();
+            taskResumeHandle = KeGetCurrentTaskHandle();
+            KeSuspendCurrentTask();
             taskResumeHandle = 0;
         }
 

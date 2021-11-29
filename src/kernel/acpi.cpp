@@ -233,21 +233,6 @@ void KeInitAPIC()
     }
 }
 
-void KeCalibrateAPICTimer(UINT64 frequency)
-{
-    KE_GET_TIME KeGetTime = keSysDescriptor->KeGetTime;
-    printf("[ APIC ] Calibrating timer\n");
-
-    /* Wait for 10 milliseconds */
-    KE_TIME initTime = KeGetTime();
-    while ((KeGetTime() - initTime) < 10e6)
-    {
-        asm volatile ("pause");
-    }
-
-
-}
-
 /*
  * C entry point of the AP bootstrap routine
  */
