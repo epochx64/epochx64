@@ -67,7 +67,7 @@ GenericException:
     mov [ERR_INFO + 632], rax
 
     ;   Error code literally never shows up so don't mind the janky offsets
-    mov rdi, [rsp]    ;   (Nonexistent) error code if it did exist
+    mov rdi, [rsp]    ;   Error code
     mov rsi, [rsp+8]    ;   RIP
     mov rdx, [rsp+16]    ;   CS
     mov rcx, [rsp+24]   ;   RFLAGS

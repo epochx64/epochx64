@@ -1,7 +1,11 @@
 %macro system_call 1
+    mov [rsp - 16], rax
     mov rax, [rel keSyscallTable]
     add rax, 8*%1
-    jmp [rax]
+    mov rax, [rax]
+    push rax
+    mov rax, [rsp - 8]
+    ret
 %endmacro
 
     bits 64

@@ -284,7 +284,7 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
             //  Sometimes GetMemoryMap fails even with the "correct" size, so we have to loop until it works
             if(Result != EFI_BUFFER_TOO_SMALL) break;
 
-            FreePool(KernelInfo.MemoryMap);
+            //FreePool(KernelInfo.MemoryMap);
         }
     }
 
@@ -293,31 +293,34 @@ EFI_STATUS efi_main(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     /*
      * Find all free memory and map it to 0x000100000000, keeping everything else identity map
-     * TODO: Find out a way to also identity map the free memory
      */
     {
-        KernelInfo.pSysMemory = 0x000100000000;
-        UINT64 SysMemoryIterator = KernelInfo.pSysMemory;
+        UINT64 largest = 0;
 
         for(EFI_MEM_DESCRIPTOR *MemDescriptor = KernelInfo.MemoryMap;
             (UINT64)MemDescriptor < (UINT64)KernelInfo.MemoryMap + KernelInfo.MemoryMapSize;
             MemDescriptor = (EFI_MEM_DESCRIPTOR*)((UINT64)MemDescriptor + KernelInfo.DescriptorSize))
         {
             // Memory address 0x10000 is occupied by multicore bootstrap code
-            if  (MemDescriptor->Type == EfiConventionalMemory &&
-                (0x10000 < SysMemoryIterator || SysMemoryIterator + MemDescriptor->NumberOfPages*0x1000 < 0x10000))
+            if  (MemDescriptor->Type == EfiConventionalMemory)
             {
-                MemDescriptor->VirtualStart = SysMemoryIterator;
+                //MemDescriptor->VirtualStart = SysMemoryIterator;
                 MemDescriptor->Attribute = EFI_MEMORY_RUNTIME;
-                MemDescriptor->Type = EfiRuntimeServicesData;
-                SysMemoryIterator += MemDescriptor->NumberOfPages*0x1000;
-                continue;
+                if (MemDescriptor->NumberOfPages > largest)
+                {
+                    largest = MemDescriptor->NumberOfPages;
+                    KernelInfo.pSysMemory = MemDescriptor->PhysicalStart;
+                    KernelInfo.sysMemorySize = largest*4096;
+                }
+
+                //SysMemoryIterator += MemDescriptor->NumberOfPages*0x1000;
+                //continue;
             }
 
+            MemDescriptor->Type = EfiRuntimeServicesData;
             MemDescriptor->VirtualStart = MemDescriptor->PhysicalStart;
         }
 
-        KernelInfo.sysMemorySize = SysMemoryIterator - KernelInfo.pSysMemory;
         KernelInfo.pSysMemoryBitMap = KernelInfo.pSysMemory;
         KernelInfo.sysMemoryBitMapSize = KernelInfo.sysMemorySize/0x1000/8 + 1;
 
