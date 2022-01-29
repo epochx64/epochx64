@@ -189,6 +189,11 @@ GetCR4Value:
     mov rax, cr4
     ret
 
+    global GetCR2Value
+GetCR2Value:
+    mov rax, cr2
+    ret
+
     global SetRSP
 SetRSP:
     sub rdi, 8
@@ -201,6 +206,11 @@ SetRSP:
     global GetRSP
 GetRSP:
     mov rax, rsp
+    ret
+
+    global GetRBP
+GetRBP:
+    mov rax, rbp
     ret
 
 ;   Sets up floating point math
@@ -328,32 +338,52 @@ memset128:
 
     global memset64
 memset64:
+    push rcx
+    push rax
+    push rdi
+
     mov rcx, rsi
     mov rax, rdx
     shr rcx, 3
     rep stosq
+
+    pop rdi
+    pop rax
+    pop rcx
     ret
 
     global memset32
 memset32:
+    push rcx
+    push rax
     mov rcx, rsi
     mov rax, rdx
     shr rcx, 2
     rep stosd
+    pop rax
+    pop rcx
     ret
 
     global memset16
 memset16:
+    push rcx
+    push rax
     mov rcx, rsi
     mov rax, rdx
     shr rcx, 1
     rep stosw
+    pop rax
+    pop rcx
     ret
 
     global memset8
 memset8:
+    push rcx
+    push rax
     mov rcx, rsi
     mov rax, rdx
     rep stosb
+    pop rax
+    pop rcx
     ret
 
