@@ -1,4 +1,4 @@
-ENTRY(KeMain)
+ENTRY(KernelBootstrap)
 
 SECTIONS
 {
@@ -18,7 +18,7 @@ SECTIONS
     {
         *(.apbootstrap)
     }
-	. = 1M;
+	. = 0xFFFFFFFF80000000 + 0x100000;
 
 	.text ALIGN (4K) : AT (ADDR (.text))
 	{

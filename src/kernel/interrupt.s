@@ -135,7 +135,7 @@ ISR48:
     mov rbx, rax
     imul rbx, 8
 
-    ; CTaskInfos is an array of pointers to KE_TASK_DESCRIPTOR structs, one for every logical processor
+    ; keTasks is an array of pointers to KE_TASK_DESCRIPTOR structs, one for every logical processor
     mov rax, [keTasks]
 
     add rax, rbx

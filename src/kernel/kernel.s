@@ -118,7 +118,7 @@ ProtectedMode:
     mov cr0, eax
     lgdt [GDTR64]
     jmp 0x08:APLongMode
-    section .text
+
     bits 64
 APLongMode:
     cli
@@ -144,3 +144,43 @@ APLongMode:
     mov rbp, rax
     extern C_APBootstrap
     call C_APBootstrap
+
+; Temporary paging structure to load kernel to higher-half
+    align 4096
+PML4_Entries:
+    dq PML3_1_Entries + 3
+    times 510 dq 0
+    dq PML3_2_Entries + 3
+
+    align 4096
+PML3_1_Entries:
+; Identity map first 8 GiBs
+    dq 0x83
+    dq 0x40000083
+    dq 0x80000083
+    dq 0xC0000083
+    dq 0x100000083
+    dq 0x140000083
+    dq 0x180000083
+    dq 0x1C0000083
+
+    align 4096
+PML3_2_Entries:
+; Map last 2 GiB (higher half) to first 2 GiBs
+    times 510 dq 0
+    dq 0x83
+    dq 0x40000083
+
+; Kernel entry point. Sets up paging structs and jumps to higher half
+    global KernelBootstrap
+KernelBootstrap:
+    ; Take over the paging structures
+    push rax
+    lea rax, [PML4_Entries]
+    add rax, 0
+    mov cr3, rax
+    pop rax
+
+    extern KeMain
+    push KeMain
+    ret
